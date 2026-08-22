@@ -1,0 +1,50 @@
+# Local deployment: the backend and its Postgres. Values come from .env (see .env.example);
+# nothing secret is written here.
+name: ktor-sample
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ktor_sample}
+      POSTGRES_USER: ${POSTGRES_USER:-ktor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      # Bound to loopback so the database is reachable from a local client but not from the network.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ktor} -d ${POSTGRES_DB:-ktor_sample}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_ISSUER: ${JWT_ISSUER:-com.example.ktor-sample}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-com.example.mobile}
+      JWT_REALM: ${JWT_REALM:-ktor-sample}
+      DATABASE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-ktor_sample}
+      DATABASE_USER: ${POSTGRES_USER:-ktor}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      DATABASE_RUN_MIGRATIONS: "true"
+      # Optional providers stay disabled unless the variables are set in .env.
+      GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
+      FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

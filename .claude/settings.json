@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Read(src/**)",
+      "Read(build.gradle.kts)",
+      "Read(settings.gradle.kts)",
+      "Read(gradle/**)",
+      "Read(*.md)",
+      "Glob(**)",
+      "Grep(**)",
+      "Edit(src/**)",
+      "Write(src/**)",
+      "Bash(./gradlew build)",
+      "Bash(./gradlew test:*)",
+      "Bash(./gradlew ktlintCheck)",
+      "Bash(./gradlew ktlintFormat)",
+      "Bash(./gradlew compileKotlin)",
+      "Bash(./gradlew dependencies)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(./gradlew run)",
+      "Bash(./gradlew flywayMigrate:*)",
+      "Bash(docker:*)",
+      "Bash(psql:*)",
+      "Edit(build.gradle.kts)",
+      "Edit(gradle/libs.versions.toml)",
+      "Edit(src/main/resources/db/migration/**)",
+      "WebFetch"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(**/*.pem)",
+      "Read(**/*.jks)",
+      "Read(**/*.keystore)",
+      "Read(./local.properties)",
+      "Read(~/.aws/**)",
+      "Read(~/.ssh/**)",
+      "Read(~/.gradle/gradle.properties)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
+      "Write(./.env)",
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -fd:*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(env)",
+      "Bash(printenv:*)",
+      "Bash(cat .env:*)",
+      "Bash(aws:*)",
+      "Bash(kubectl:*)",
+      "Bash(flyway clean:*)",
+      "Bash(./gradlew flywayClean:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if git diff --name-only | grep -q '\\.kt$'; then ./gradlew ktlintFormat --quiet; fi"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-prod-db.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/scan-secrets.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "JAVA_HOME": "/usr/lib/jvm/temurin-21-jdk"
+  }
+}

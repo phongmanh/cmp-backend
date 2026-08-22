@@ -1,0 +1,18 @@
+# Everything the image build does not need. Keeps the build context small and keeps local
+# secrets out of the daemon.
+.env
+.env.*
+!.env.example
+*.pem
+*.jks
+local.properties
+
+build/
+.gradle/
+.kotlin/
+.idea/
+.claude/
+.git/
+
+*.log
+.DS_Store

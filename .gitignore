@@ -1,0 +1,13 @@
+.env
+.env.*
+*.pem
+*.jks
+*.keystore
+local.properties
+
+build/
+.gradle/
+.kotlin/
+.idea/
+
+.claude/settings.local.json

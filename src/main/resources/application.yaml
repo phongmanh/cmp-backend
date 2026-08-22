@@ -1,0 +1,45 @@
+ktor:
+  deployment:
+    port: 8080
+  application:
+    modules:
+      - com.example.plugins.KoinKt.configureKoin
+      - com.example.plugins.DatabaseKt.configureDatabase
+      - com.example.plugins.HttpKt.configureHttp
+      - com.example.plugins.SecurityKt.configureSecurity
+      - com.example.SerializationKt.configureSerialization
+      - com.example.plugins.StatusPagesKt.configureStatusPages
+      - com.example.plugins.ValidationKt.configureRequestValidation
+      - com.example.RoutingKt.configureRouting
+      - com.example.plugins.DocsKt.configureDocs
+      - com.example.feature.auth.AuthRoutesKt.authRoutes
+      - com.example.feature.user.UserRoutesKt.userRoutes
+
+# Only the names of the environment variables live here. Values are supplied by the environment and
+# the application refuses to start when a required one is missing.
+jwt:
+  secret: "$JWT_SECRET:"
+  issuer: "$JWT_ISSUER:com.example.ktor-sample"
+  audience: "$JWT_AUDIENCE:com.example.mobile"
+  realm: "$JWT_REALM:ktor-sample"
+  accessTokenMinutes: "$JWT_ACCESS_TOKEN_MINUTES:15"
+  refreshTokenDays: "$JWT_REFRESH_TOKEN_DAYS:30"
+
+database:
+  url: "$DATABASE_URL:"
+  user: "$DATABASE_USER:"
+  password: "$DATABASE_PASSWORD:"
+  maxPoolSize: "$DATABASE_MAX_POOL_SIZE:10"
+  shouldRunMigrations: "$DATABASE_RUN_MIGRATIONS:true"
+
+# A provider is enabled only when it is configured.
+social:
+  google:
+    clientIds: "$GOOGLE_CLIENT_IDS:"
+  facebook:
+    appId: "$FACEBOOK_APP_ID:"
+    appSecret: "$FACEBOOK_APP_SECRET:"
+
+security:
+  allowedOrigins: "$CORS_ALLOWED_ORIGINS:"
+  bcryptCost: "$BCRYPT_COST:12"

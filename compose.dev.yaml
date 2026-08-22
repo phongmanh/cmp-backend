@@ -1,0 +1,45 @@
+# Development environment: the backing services only. The application itself runs on the host with
+# `./gradlew run`, so an iteration is a Gradle task instead of an image build. Use compose.yaml when
+# you want the packaged application in a container as well.
+# Values come from .env (see env.example); nothing secret is written here.
+name: ktor-sample-dev
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ktor_sample}
+      POSTGRES_USER: ${POSTGRES_USER:-ktor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      # Bound to loopback so the database is reachable from the host application and a local client,
+      # but not from the network.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # A dev volume of its own: resetting the development data never touches compose.yaml's data.
+      - postgres-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ktor} -d ${POSTGRES_DB:-ktor_sample}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # Development-only database UI. It grants full access to whoever opens it, so it is bound to
+  # loopback and belongs in this file only — never in compose.yaml.
+  adminer:
+    image: adminer:5-standalone
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Preselects the db service on the login form; the password is still typed in.
+      ADMINER_DEFAULT_SERVER: db
+    ports:
+      # Defaults to 8081 because the application takes 8080 on the host.
+      - "127.0.0.1:${ADMINER_PORT:-8081}:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres-dev-data:
