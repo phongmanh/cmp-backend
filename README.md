@@ -123,7 +123,7 @@ an iteration is a Gradle task instead of an image build. Use `compose.yaml` inst
 the packaged application in a container as well.
 
 ```bash
-cp env.example .env          # then fill in JWT_SECRET and POSTGRES_PASSWORD
+cp env.example .env          # then fill in JWT_SECRET, POSTGRES_PASSWORD and DATABASE_PASSWORD
 docker compose -f compose.dev.yaml up -d      # Postgres on 127.0.0.1:5432,
                                               # Adminer on http://127.0.0.1:8081
 set -a; source .env; set +a                   # export the variables the app reads
