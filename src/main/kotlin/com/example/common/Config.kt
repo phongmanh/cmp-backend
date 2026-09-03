@@ -44,6 +44,7 @@ data class AppConfig(
     val social: SocialConfig,
     val allowedOrigins: List<String>,
     val bcryptCost: Int,
+    val shouldTrustProxyHeaders: Boolean,
 )
 
 fun ApplicationConfig.toAppConfig(): AppConfig =
@@ -68,6 +69,7 @@ fun ApplicationConfig.toAppConfig(): AppConfig =
         social = socialConfig(),
         allowedOrigins = list("security.allowedOrigins"),
         bcryptCost = int("security.bcryptCost", 12),
+        shouldTrustProxyHeaders = boolean("security.trustProxyHeaders", false),
     )
 
 private fun ApplicationConfig.socialConfig(): SocialConfig {

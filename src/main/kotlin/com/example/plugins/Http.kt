@@ -8,6 +8,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.defaultheaders.DefaultHeaders
+import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
 import io.ktor.server.plugins.hsts.HSTS
 import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.ratelimit.RateLimit
@@ -17,6 +18,13 @@ import kotlin.time.Duration.Companion.minutes
 
 fun Application.configureHttp() {
     val appConfig by inject<AppConfig>()
+
+    // The rate limiter keys on the caller's address, which behind a proxy is the proxy's own.
+    // Reading it from X-Forwarded-For is only safe where the proxy overwrites that header rather
+    // than passing a client-supplied one through, so it stays off unless the deployment says so.
+    if (appConfig.shouldTrustProxyHeaders) {
+        install(XForwardedHeaders)
+    }
 
     install(DefaultHeaders) {
         header("X-Content-Type-Options", "nosniff")

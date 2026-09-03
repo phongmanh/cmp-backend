@@ -59,6 +59,7 @@ dependencies {
     implementation(ktorLibs.server.core)
     implementation(ktorLibs.server.cors)
     implementation(ktorLibs.server.defaultHeaders)
+    implementation(ktorLibs.server.forwardedHeader)
     implementation(ktorLibs.server.hsts)
     implementation(ktorLibs.server.netty)
     implementation(ktorLibs.server.rateLimit)

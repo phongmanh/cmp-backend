@@ -46,3 +46,7 @@ social:
 security:
   allowedOrigins: "$CORS_ALLOWED_ORIGINS:"
   bcryptCost: "$BCRYPT_COST:12"
+  # Off by default: anyone who can reach the server directly can forge X-Forwarded-For, and the
+  # auth rate limiter keys on the caller's address. Turn it on only where a proxy that overwrites
+  # the header sits in front, which is what a managed platform does.
+  trustProxyHeaders: "$TRUST_PROXY_HEADERS:false"
