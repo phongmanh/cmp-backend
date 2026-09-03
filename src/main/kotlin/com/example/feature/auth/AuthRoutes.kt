@@ -1,6 +1,7 @@
 package com.example.feature.auth
 
 import com.example.api.ApiRoutes
+import com.example.api.auth.ChangePasswordRequest
 import com.example.api.auth.LoginRequest
 import com.example.api.auth.RefreshTokenRequest
 import com.example.api.auth.RegisterRequest
@@ -38,6 +39,7 @@ const val AUTH_RATE_LIMIT = "auth"
 private const val AUTH_TAG = "Auth"
 private const val EMAIL = "ada@example.com"
 private const val PASSWORD = "correct-horse-battery"
+private const val NEW_PASSWORD = "stapler-lantern-frost"
 private const val GOOGLE_TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjBhZjc..."
 private const val FACEBOOK_TOKEN = "EAAG7ZC1ZBk8kBO2ZC..."
 private const val REFRESH_TOKEN = "8Kx2rQ7vT1nMcZp0aYbWl4gHsJdF6eRu9oPqXzNvB3s"
@@ -232,6 +234,58 @@ fun Application.authRoutes() {
                     unauthorized()
                     payloadTooLarge()
                     internalError()
+                }
+            }
+
+            rateLimit(RateLimitName(AUTH_RATE_LIMIT)) {
+                post(ApiRoutes.Auth.PASSWORD) {
+                    val request = call.receive<ChangePasswordRequest>()
+                    val result =
+                        authService.changePassword(
+                            call.requireUserId(),
+                            request.currentPassword,
+                            request.newPassword,
+                        )
+                    call.respond(HttpStatusCode.OK, result.toResponse())
+                }.describe {
+                    tag(AUTH_TAG)
+                    operationId = "changePassword"
+                    summary = "Replace the signed-in user's password"
+                    requestBody {
+                        jsonBody(
+                            BodyExample(
+                                "change",
+                                "The password in use and the one to replace it with",
+                                ChangePasswordRequest(PASSWORD, NEW_PASSWORD),
+                            ),
+                        )
+                    }
+                    description =
+                        """
+                        The current password is required on top of the access token, so a device somebody
+                        walked up to cannot be used to lock its owner out.
+
+                        Succeeding **signs every session out**, this one included, and the response carries a
+                        fresh pair to replace the tokens you were holding. Store both: the refresh token you
+                        sent this call with is already dead. Other devices have to sign in again with the new
+                        password.
+
+                        An account that only signs in through a provider has no password to compare against
+                        and answers `422`.
+
+                        $RATE_LIMIT_NOTE
+                        """.trimIndent()
+                    responses {
+                        HttpStatusCode.OK {
+                            description = "The password was replaced. The body is a fresh token pair for this device."
+                        }
+                        badRequest("The new password breaks a length rule, or it is the same as the current one.")
+                        unauthorized("The access token is missing or invalid, or the current password is wrong.")
+                        unprocessable("The account signs in through a provider and has no password to change.")
+                        payloadTooLarge()
+                        tooManyRequests()
+                        internalError()
+                    }
                 }
             }
 

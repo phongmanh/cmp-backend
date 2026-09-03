@@ -1,6 +1,9 @@
 ktor:
   deployment:
-    port: 8080
+    # What the server binds to, not what the outside world reaches: compose publishes the container
+    # port as APP_PORT, and a reverse proxy owns the public host name. PORT carries no KTOR_ prefix
+    # because a managed platform injects that exact name and expects the process to obey it.
+    port: "$PORT:8080"
   application:
     modules:
       - com.example.plugins.KoinKt.configureKoin

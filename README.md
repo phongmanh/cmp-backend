@@ -31,6 +31,7 @@ Facebook SDK and exchanges it here for our own tokens; the backend never runs an
 | POST | `/api/v1/auth/login` | public | Exchange an email and password for tokens |
 | POST | `/api/v1/auth/social` | public | Exchange a Google id_token or Facebook access token for tokens |
 | POST | `/api/v1/auth/refresh` | public | Rotate a refresh token |
+| POST | `/api/v1/auth/password` | access token | Replace the caller's password and drop every other session |
 | POST | `/api/v1/auth/logout` | access token | Revoke the presented refresh token |
 | POST | `/api/v1/auth/logout-all` | access token | Revoke every refresh token for the caller |
 | POST | `/api/v1/auth/link` | access token | Attach a provider account to the signed-in user |
@@ -47,6 +48,7 @@ application refuses to start when a required one is missing.
 
 | Variable | Required | Default | Notes |
 |---|---|---|---|
+| `PORT` | no | `8080` | Port the server binds to; `APP_PORT` publishes it on the host |
 | `JWT_SECRET` | yes | — | HMAC256 signing key for access tokens |
 | `JWT_ISSUER` | no | `com.example.ktor-sample` | |
 | `JWT_AUDIENCE` | no | `com.example.mobile` | |
@@ -122,13 +124,36 @@ entirely — add `includeBuild("../ktor-sample")` to the app's `settings.gradle.
 an iteration is a Gradle task instead of an image build. Use `compose.yaml` instead when you want
 the packaged application in a container as well.
 
+### Starting the server
+
+Two things have to be up: Postgres in Docker, and the application on the host. `docker compose up`
+starts the first only — nothing answers on port 8080 until you also run `./gradlew run`.
+
 ```bash
-cp env.example .env          # then fill in JWT_SECRET, POSTGRES_PASSWORD and DATABASE_PASSWORD
+cp env.example .env          # once; then fill in JWT_SECRET, POSTGRES_PASSWORD and DATABASE_PASSWORD
 docker compose -f compose.dev.yaml up -d      # Postgres on 127.0.0.1:5432,
                                               # Adminer on http://127.0.0.1:8081
 set -a; source .env; set +a                   # export the variables the app reads
 ./gradlew run                                 # Flyway migrates on startup
 ```
+
+The application never reads `.env` itself — it reads the environment. `set -a; source .env; set +a`
+exports it into the current shell only, so repeat that line in every new terminal you start the
+server from. Miss it and startup stops on the first missing variable:
+
+```
+Missing required configuration 'jwt.secret'. Set the JWT_SECRET environment variable.
+```
+
+It is serving once the log reaches these two lines:
+
+```
+[main] INFO  Application - Application started in 0.864 seconds.
+[DefaultDispatcher-worker-1] INFO  Application - Responding at http://0.0.0.0:8080
+```
+
+Then open <http://127.0.0.1:8080/docs>. `Ctrl-C` stops the application; Postgres keeps running until
+you bring the compose stack down, so the next `./gradlew run` starts against the same data.
 
 | Task | Description |
 |------|-------------|
@@ -137,6 +162,21 @@ set -a; source .env; set +a                   # export the variables the app rea
 | `open http://127.0.0.1:8081` | Adminer; log in with the `POSTGRES_*` values from `.env` |
 | `docker compose -f compose.dev.yaml down` | Stop, keeping the data |
 | `docker compose -f compose.dev.yaml down -v` | Stop and drop the development data |
+
+### When it will not start
+
+| Symptom | Cause |
+|---|---|
+| `ERR_CONNECTION_REFUSED` on `/docs` | The application is not running. Compose being up is not enough — start it with `./gradlew run`. |
+| `Missing required configuration '...'` | The variables were not exported in this shell. Re-run `set -a; source .env; set +a`. |
+| `Connection to localhost:5432 refused` | Postgres is down. `docker compose -f compose.dev.yaml ps` should show `db` as `healthy`. |
+| `Address already in use` | Something else holds 8080. `lsof -nP -iTCP:8080 -sTCP:LISTEN` names it. |
+| `No 'Access-Control-Allow-Origin' header is present` in a browser console | The page's origin is not in `CORS_ALLOWED_ORIGINS`, so the server refuses the preflight with a bare `403`. Add the exact scheme + host + port, re-export, and restart. |
+
+`PORT` in `.env` moves it — `./gradlew run` reads the environment, so `PORT=9090` and a re-run of
+`set -a; source .env; set +a` is the whole change. `APP_PORT` is a different setting: it is the
+*host* side of `compose.yaml`'s port mapping, whose container side follows `PORT`, and it has no
+effect on `./gradlew run`.
 
 ## API documentation
 
@@ -178,20 +218,15 @@ forget either. It also pins exactly which endpoints require a token, so moving a
 `authenticate` is a deliberate, visible change.
 
 ## Building & Running
-To build or run the project, use one of the following tasks:
-
 
 | Task | Description |
 |------|-------------|
 | `./gradlew test`    | Run the tests     |
-| `./gradlew build`   | Build the project |
-| `./gradlew run`     | Run the server    |
+| `./gradlew build`   | Compile and test  |
+| `./gradlew run`     | Run the server on :8080 |
+| `./gradlew ktlintFormat` | Auto-fix style |
+| `./gradlew buildFatJar`  | Build the deployable jar |
 
-Running it in Docker, locally or on a server, is covered in
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
-
-If the server starts successfully, you'll see the following output:
-```
-2024-12-04 14:32:45.584 [main] INFO  Application - Application started in 0.303 seconds.
-2024-12-04 14:32:45.682 [main] INFO  Application - Responding at http://0.0.0.0:8080
-```
+`./gradlew run` needs Postgres up and the environment exported first — see
+[Starting the server](#starting-the-server) for the full sequence. Running the application in
+Docker, locally or on a server, is covered in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).

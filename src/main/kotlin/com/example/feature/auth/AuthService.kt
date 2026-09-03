@@ -1,7 +1,9 @@
 package com.example.feature.auth
 
 import com.example.api.auth.SocialProvider
+import com.example.api.common.ErrorCode
 import com.example.common.AuthenticationException
+import com.example.common.BusinessRuleException
 import com.example.common.ConflictException
 import com.example.common.maskEmail
 import com.example.feature.auth.social.SocialIdentity
@@ -72,6 +74,37 @@ class AuthService(
         if (!credentials.isActive) throw AuthenticationException(INVALID_CREDENTIALS)
 
         val user = userRepository.findById(credentials.userId) ?: throw AuthenticationException(INVALID_CREDENTIALS)
+        return issueTokens(user)
+    }
+
+    /**
+     * Every other session is dropped, because the usual reason to change a password is to push
+     * somebody else out. The caller gets a fresh pair back so the device doing the change is the
+     * one login that survives.
+     */
+    suspend fun changePassword(
+        userId: UUID,
+        currentPassword: String,
+        newPassword: String,
+    ): AuthResult {
+        val credentials =
+            userRepository.findCredentialsById(userId)?.takeIf { it.isActive }
+                ?: throw AuthenticationException(STALE_ACCESS_TOKEN)
+
+        // A provider-only account has nothing to compare against; it needs a set-password flow.
+        val currentHash =
+            credentials.passwordHash
+                ?: throw BusinessRuleException(ErrorCode.PASSWORD_NOT_SET, NO_PASSWORD_TO_CHANGE)
+
+        if (!passwordHasher.verify(currentPassword, currentHash)) {
+            throw AuthenticationException(WRONG_CURRENT_PASSWORD)
+        }
+
+        val newHash = passwordHasher.hash(newPassword)
+        if (!userRepository.replacePassword(userId, newHash)) throw AuthenticationException(STALE_ACCESS_TOKEN)
+
+        val user = userRepository.findById(userId) ?: throw AuthenticationException(STALE_ACCESS_TOKEN)
+        logger.info("Password changed for user {}; every refresh token was revoked", userId)
         return issueTokens(user)
     }
 
@@ -225,5 +258,8 @@ class AuthService(
         const val ACCOUNT_DISABLED = "This account is not active."
         const val SIGN_IN_CONFLICT = "Sign-in could not be completed. Please try again."
         const val PROVIDER_LINKED_ELSEWHERE = "That account is already linked to a different user."
+        const val WRONG_CURRENT_PASSWORD = "The current password is incorrect."
+        const val NO_PASSWORD_TO_CHANGE = "This account signs in through a provider and has no password to change."
+        const val STALE_ACCESS_TOKEN = "Missing or invalid access token."
     }
 }

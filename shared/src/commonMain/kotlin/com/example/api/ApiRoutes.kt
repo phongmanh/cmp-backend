@@ -19,6 +19,7 @@ object ApiRoutes {
         const val LOGIN = "$PATH/login"
         const val SOCIAL = "$PATH/social"
         const val REFRESH = "$PATH/refresh"
+        const val PASSWORD = "$PATH/password"
         const val LOGOUT = "$PATH/logout"
         const val LOGOUT_ALL = "$PATH/logout-all"
         const val LINK = "$PATH/link"

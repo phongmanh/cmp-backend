@@ -1,5 +1,3 @@
-package com.example
-
 import io.ktor.server.application.Application
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText

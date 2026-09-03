@@ -18,7 +18,7 @@ class FakeSocialVerifier(
 
 fun socialIdentity(
     provider: SocialProvider = SocialProvider.GOOGLE,
-    providerUserId: String,
+    providerUserId: String = uniqueProviderUserId(),
     email: String? = null,
     isEmailVerified: Boolean = true,
     displayName: String? = null,

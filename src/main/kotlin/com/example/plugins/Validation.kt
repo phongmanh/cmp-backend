@@ -1,5 +1,6 @@
 package com.example.plugins
 
+import com.example.api.auth.ChangePasswordRequest
 import com.example.api.auth.LoginRequest
 import com.example.api.auth.RefreshTokenRequest
 import com.example.api.auth.RegisterRequest
@@ -69,6 +70,16 @@ fun Application.configureRequestValidation() {
             )
         }
 
+        // The current password is only checked for presence: an account may hold one that predates
+        // today's policy, and rejecting it here would lock its owner out of fixing exactly that.
+        validate<ChangePasswordRequest> { request ->
+            checks(
+                presenceProblems(request.currentPassword, "current password", MAX_PASSWORD_LENGTH) +
+                    passwordProblems(request.newPassword, "New password") +
+                    reusedPasswordProblems(request.currentPassword, request.newPassword),
+            )
+        }
+
         validate<SocialSignInRequest> { request ->
             checks(presenceProblems(request.token, "token", MAX_TOKEN_LENGTH))
         }
@@ -90,16 +101,24 @@ private fun emailProblems(email: String): List<String> =
         else -> emptyList()
     }
 
-private fun passwordProblems(password: String): List<String> =
+private fun passwordProblems(
+    password: String,
+    label: String = "Password",
+): List<String> =
     when {
         password.length < MIN_PASSWORD_LENGTH ->
-            listOf("Password must be at least $MIN_PASSWORD_LENGTH characters.")
+            listOf("$label must be at least $MIN_PASSWORD_LENGTH characters.")
         password.length > MAX_PASSWORD_LENGTH ->
-            listOf("Password must be at most $MAX_PASSWORD_LENGTH characters.")
+            listOf("$label must be at most $MAX_PASSWORD_LENGTH characters.")
         password.toByteArray(Charsets.UTF_8).size > MAX_PASSWORD_BYTES ->
-            listOf("Password must be at most $MAX_PASSWORD_BYTES bytes.")
+            listOf("$label must be at most $MAX_PASSWORD_BYTES bytes.")
         else -> emptyList()
     }
+
+private fun reusedPasswordProblems(
+    currentPassword: String,
+    newPassword: String,
+): List<String> = if (currentPassword == newPassword) listOf("New password must differ from the current one.") else emptyList()
 
 private fun displayNameProblems(displayName: String?): List<String> =
     when {

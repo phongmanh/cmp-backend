@@ -11,6 +11,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.openapi.OpenApiDocSource
 import io.ktor.server.routing.openapi.hide
 import io.ktor.server.routing.routing
+import io.ktor.utils.io.ExperimentalKtorApi
 
 /**
  * Interactive documentation, in the style of FastAPI's `/docs`.
@@ -20,6 +21,7 @@ import io.ktor.server.routing.routing
  * server actually runs, so they cannot drift. What the code cannot know — prose, and the failures
  * `StatusPages` produces — is declared per route with `describe { }`.
  */
+@OptIn(ExperimentalKtorApi::class)
 fun Application.configureDocs() {
     routing {
         swaggerUI(path = "docs") {
@@ -41,11 +43,9 @@ fun Application.configureDocs() {
 
 private val jsonSource = OpenApiDocSource.Routing(contentType = ContentType.Application.Json)
 
-private fun apiServers(): List<Server> =
-    listOf(
-        Server(url = "http://localhost:8080", description = "Local development"),
-        Server(url = "https://api.example.com", description = "Deployed environment (HTTPS only)"),
-    )
+// Swagger UI calls the machine the server runs on. A deployed instance is reached at its own host,
+// which this document does not need to name.
+private fun apiServers(): List<Server> = listOf(Server(url = "http://localhost:8080", description = "Local development"))
 
 private fun apiInfo(): OpenApiInfo =
     OpenApiInfo(
@@ -72,6 +72,10 @@ private val API_DESCRIPTION =
     token is treated as a leak and revokes every token in that login's family, so the user must
     sign in again.
 
+    Changing a password at `POST /api/v1/auth/password` revokes **every** refresh token the account
+    holds, the one you sent it with included. That response carries a replacement pair, so store
+    both and carry on; every other device has to sign in again with the new password.
+
     ## Conventions
 
     - Every field name in JSON is `camelCase`.
@@ -96,13 +100,16 @@ private val API_DESCRIPTION =
     | `CONFLICT` | 409 | The email is taken, or the social account belongs to somebody else. |
     | `PAYLOAD_TOO_LARGE` | 413 | The body is over 64 KB. |
     | `PROVIDER_NOT_ENABLED` | 422 | That social provider is not configured on this deployment. |
+    | `PASSWORD_NOT_SET` | 422 | The account signs in through a provider and has no password to change. |
     | `INTERNAL_ERROR` | 500 | Something went wrong. Details stay in the server log. |
 
     ## Rate limiting
 
-    The four unauthenticated `/api/v1/auth/*` routes allow **10 requests per minute per client IP**.
-    Over the limit the server answers `429` with a `Retry-After` header and an empty body — this is
-    the one response that does not use the `ErrorResponse` shape.
+    The four unauthenticated `/api/v1/auth/*` routes, plus `POST /api/v1/auth/password`, allow
+    **10 requests per minute per client IP**. The password route is counted even though it needs a
+    token, because it checks a password and would otherwise be somewhere to guess one. Over the
+    limit the server answers `429` with a `Retry-After` header and an empty body — this is the one
+    response that does not use the `ErrorResponse` shape.
 
     ## Field rules
 
@@ -114,5 +121,9 @@ private val API_DESCRIPTION =
       everything past that rather than failing.
     - `displayName` — optional, at most 120 characters, never blank when present.
     - `avatarUrl` — optional, at most 512 characters, and an absolute `https` URL when present.
+    - `currentPassword` — required, at most 128 characters. It is only compared against the stored
+      hash, never against the rules above, so a password predating a policy change can still be
+      used to replace itself.
+    - `newPassword` — the `password` rules above, and it must differ from `currentPassword`.
     - `token` / `refreshToken` — at most 8192 characters.
     """.trimIndent()

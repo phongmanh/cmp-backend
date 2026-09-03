@@ -6,6 +6,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
@@ -45,6 +46,24 @@ class DocsRoutesTest {
         }
 
     @Test
+    fun `advertises the local development server`() =
+        authTestApplication {
+            val servers =
+                Json
+                    .parseToJsonElement(client.get("/openapi.json").bodyAsText())
+                    .jsonObject
+                    .getValue("servers")
+                    .jsonArray
+                    .map {
+                        it.jsonObject
+                            .getValue("url")
+                            .jsonPrimitive.content
+                    }
+
+            assertEquals(listOf("http://localhost:8080"), servers)
+        }
+
+    @Test
     fun `describes every route it publishes`() =
         authTestApplication {
             val undescribed =
@@ -69,6 +88,7 @@ class DocsRoutesTest {
 
             assertEquals(
                 setOf(
+                    "post /api/v1/auth/password",
                     "post /api/v1/auth/logout",
                     "post /api/v1/auth/logout-all",
                     "post /api/v1/auth/link",

@@ -1,19 +1,20 @@
 package com.example.support
 
 import com.example.common.AppConfig
+import com.example.common.createDataSource
+import com.example.common.runMigrations
 import com.example.common.toAppConfig
-import com.example.configureSerialization
 import com.example.feature.auth.authRoutes
 import com.example.feature.auth.social.SocialIdentityVerifier
 import com.example.feature.auth.social.SocialVerifierRegistry
 import com.example.feature.user.userRoutes
 import com.example.plugins.appModule
-import com.example.plugins.configureDatabase
 import com.example.plugins.configureDocs
 import com.example.plugins.configureHttp
 import com.example.plugins.configureRequestValidation
 import com.example.plugins.configureSecurity
 import com.example.plugins.configureStatusPages
+import configureSerialization
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
@@ -22,6 +23,7 @@ import io.ktor.server.config.MapApplicationConfig
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.sql.Database
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
@@ -50,6 +52,25 @@ fun testAppConfig(): AppConfig {
 }
 
 /**
+ * One pool and one Exposed registration for the whole test JVM.
+ *
+ * A test application used to run `configureDatabase`, which opens a pool and closes it again when
+ * the application stops. Exposed resolves the database for a `dbQuery` through a thread local held
+ * on the dispatcher thread, and those threads outlive the application that first used them, so a
+ * request in a later test could land on a thread still pointing at a closed pool and fail with
+ * "HikariDataSource has been closed". The server connects once in production, where that ambiguity
+ * cannot arise; the harness now does the same.
+ */
+private val testDatabase: Database by lazy {
+    val dataSource = createDataSource(testAppConfig().database)
+    runMigrations(dataSource)
+    Database.connect(dataSource)
+}
+
+/** Opens [testDatabase] on first use. Stands in for `configureDatabase`, which closes its pool. */
+private fun connectTestDatabase(): Database = testDatabase
+
+/**
  * Boots the real application wiring against a throwaway Postgres. Skipped rather than failed when
  * there is no Docker daemon to run the container on.
  */
@@ -69,7 +90,7 @@ fun authTestApplication(
                     module { single { SocialVerifierRegistry(verifiers) } },
                 )
             }
-            configureDatabase()
+            connectTestDatabase()
             configureHttp()
             configureSecurity()
             configureSerialization()
@@ -92,3 +113,6 @@ fun ApplicationTestBuilder.jsonClient(): HttpClient =
     }
 
 fun uniqueEmail(): String = "user-${UUID.randomUUID()}@example.com"
+
+/** Every test shares one database, so a provider account id has to be unique across the suite. */
+fun uniqueProviderUserId(): String = "provider-user-${UUID.randomUUID()}"

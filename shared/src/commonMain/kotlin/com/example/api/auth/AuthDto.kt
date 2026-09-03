@@ -27,6 +27,19 @@ data class SocialSignInRequest(
     val token: String,
 )
 
+/**
+ * Sent to `POST /api/v1/auth/password` by a signed-in user.
+ *
+ * [currentPassword] is proof that the person at the keyboard is the account owner and not somebody
+ * who walked up to an unlocked device, so it is required even though the call already carries an
+ * access token.
+ */
+@Serializable
+data class ChangePasswordRequest(
+    val currentPassword: String,
+    val newPassword: String,
+)
+
 @Serializable
 data class RefreshTokenRequest(
     val refreshToken: String,

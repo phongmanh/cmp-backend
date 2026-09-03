@@ -32,7 +32,7 @@ class SocialAuthRoutesTest {
         val verifier =
             FakeSocialVerifier(
                 SocialProvider.GOOGLE,
-                mapOf("google-token" to socialIdentity(providerUserId = "google-1", email = email, displayName = "Ada")),
+                mapOf("google-token" to socialIdentity(email = email, displayName = "Ada")),
             )
 
         authTestApplication(listOf(verifier)) {
@@ -54,7 +54,6 @@ class SocialAuthRoutesTest {
                 mapOf(
                     "google-token" to
                         socialIdentity(
-                            providerUserId = "google-avatar",
                             email = uniqueEmail(),
                             avatarUrl = "https://lh3.googleusercontent.com/a/ada",
                         ),
@@ -76,7 +75,6 @@ class SocialAuthRoutesTest {
                 mapOf(
                     "google-token" to
                         socialIdentity(
-                            providerUserId = "google-bad-avatar",
                             email = uniqueEmail(),
                             avatarUrl = "http://lh3.googleusercontent.com/a/ada",
                         ),
@@ -96,7 +94,7 @@ class SocialAuthRoutesTest {
         val verifier =
             FakeSocialVerifier(
                 SocialProvider.GOOGLE,
-                mapOf("google-token" to socialIdentity(providerUserId = "google-2", email = uniqueEmail())),
+                mapOf("google-token" to socialIdentity(email = uniqueEmail())),
             )
 
         authTestApplication(listOf(verifier)) {
@@ -115,7 +113,7 @@ class SocialAuthRoutesTest {
         val verifier =
             FakeSocialVerifier(
                 SocialProvider.GOOGLE,
-                mapOf("google-token" to socialIdentity(providerUserId = "google-3", email = email)),
+                mapOf("google-token" to socialIdentity(email = email)),
             )
 
         authTestApplication(listOf(verifier)) {
@@ -140,7 +138,7 @@ class SocialAuthRoutesTest {
                 SocialProvider.GOOGLE,
                 mapOf(
                     "google-token" to
-                        socialIdentity(providerUserId = "google-4", email = email, isEmailVerified = false),
+                        socialIdentity(email = email, isEmailVerified = false),
                 ),
             )
 
@@ -210,7 +208,7 @@ class SocialAuthRoutesTest {
         val verifier =
             FakeSocialVerifier(
                 SocialProvider.GOOGLE,
-                mapOf("google-token" to socialIdentity(providerUserId = "google-5", email = uniqueEmail())),
+                mapOf("google-token" to socialIdentity(email = uniqueEmail())),
             )
 
         authTestApplication(listOf(verifier)) {
@@ -234,7 +232,7 @@ class SocialAuthRoutesTest {
         val verifier =
             FakeSocialVerifier(
                 SocialProvider.GOOGLE,
-                mapOf("google-token" to socialIdentity(providerUserId = "google-6", email = uniqueEmail())),
+                mapOf("google-token" to socialIdentity(email = uniqueEmail())),
             )
 
         authTestApplication(listOf(verifier)) {

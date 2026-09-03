@@ -1,5 +1,6 @@
 package com.example.api
 
+import com.example.api.auth.ChangePasswordRequest
 import com.example.api.auth.SocialProvider
 import com.example.api.auth.SocialSignInRequest
 import com.example.api.auth.TokenResponse
@@ -21,6 +22,7 @@ class ApiContractTest {
     fun `route constants carry the version prefix`() {
         assertEquals("/api/v1/auth/register", ApiRoutes.Auth.REGISTER)
         assertEquals("/api/v1/auth/logout-all", ApiRoutes.Auth.LOGOUT_ALL)
+        assertEquals("/api/v1/auth/password", ApiRoutes.Auth.PASSWORD)
         assertEquals("/api/v1/users/me", ApiRoutes.Users.ME)
     }
 
@@ -36,6 +38,13 @@ class ApiContractTest {
         assertEquals("""{"provider":"google","token":"id-token"}""", encoded)
         assertEquals(SocialProvider.FACEBOOK, SocialProvider.fromKey("facebook"))
         assertNull(SocialProvider.fromKey("twitter"))
+    }
+
+    @Test
+    fun `a change of password names both halves on the wire`() {
+        val encoded = json.encodeToString(ChangePasswordRequest("old-password", "new-password"))
+
+        assertEquals("""{"currentPassword":"old-password","newPassword":"new-password"}""", encoded)
     }
 
     @Test

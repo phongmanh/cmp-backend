@@ -30,4 +30,7 @@ object ErrorCode {
 
     /** The deployment the app is talking to has no credentials for that social provider. */
     const val PROVIDER_NOT_ENABLED = "PROVIDER_NOT_ENABLED"
+
+    /** The account signs in through a provider only, so there is no password to change. */
+    const val PASSWORD_NOT_SET = "PASSWORD_NOT_SET"
 }

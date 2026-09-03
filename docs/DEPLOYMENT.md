@@ -63,6 +63,9 @@ What happens, in order:
 2. `app` starts only once `db` reports healthy, so the application never races the database.
 3. Flyway applies pending migrations.
 4. Netty binds `0.0.0.0:8080` inside the container, published on `127.0.0.1:8080` of the host.
+   `PORT` changes what it binds — `compose.yaml` passes it through and maps `APP_PORT` to whatever
+   `PORT` says, so the two ends of the mapping cannot drift apart. Restricting exposure is the
+   `127.0.0.1` in the published port.
 
 A healthy startup looks like this:
 
@@ -221,6 +224,7 @@ image that worked.
 | `Missing required configuration 'database.url'. Set the DATABASE_URL environment variable.` | The variable never reached the container | Check the `environment:` block, or the `-e` flags on `docker run` |
 | `Facebook is half configured` | One of the two Facebook variables is set | Set both, or neither to disable the provider |
 | `Bind for 127.0.0.1:8080 failed: port is already allocated` | Something else holds the port | Set `APP_PORT` or `POSTGRES_PORT` in `.env` |
+| Container never turns `healthy` after setting `PORT` | — | The healthcheck follows `PORT`; make sure the platform routes to that same port |
 | App container never turns `healthy` | Usually the database | `docker compose logs app`; confirm `db` is healthy first |
 | `Configuring project ':shared' without an existing directory` | The Dockerfile is missing the `shared/` copies | See [What is in the image](#3-what-is-in-the-image) |
 | `Validate failed: Migration checksum mismatch` | An already-applied migration file was edited | Restore the file; put the change in a new migration |

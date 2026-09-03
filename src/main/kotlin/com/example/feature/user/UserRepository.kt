@@ -1,6 +1,7 @@
 package com.example.feature.user
 
 import com.example.common.dbQuery
+import com.example.feature.auth.RefreshTokenTable
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
@@ -42,6 +43,49 @@ class UserRepository {
                         isActive = it[UserTable.isActive],
                     )
                 }
+        }
+
+    suspend fun findCredentialsById(userId: UUID): UserCredentials? =
+        dbQuery {
+            UserTable
+                .selectAll()
+                .where { (UserTable.id eq userId) and UserTable.deletedAt.isNull() }
+                .singleOrNull()
+                ?.let {
+                    UserCredentials(
+                        userId = it[UserTable.id].value,
+                        passwordHash = it[UserTable.passwordHash],
+                        isActive = it[UserTable.isActive],
+                    )
+                }
+        }
+
+    /**
+     * The new hash and the revocation of every live refresh token are one write, because a password
+     * change that left the old sessions running would not have taken anything away from whoever the
+     * user is changing it to escape. Reports back whether a row was there to write.
+     */
+    suspend fun replacePassword(
+        userId: UUID,
+        passwordHash: String,
+    ): Boolean =
+        dbQuery {
+            val now = Instant.now()
+            val rowsWritten =
+                UserTable.update({ (UserTable.id eq userId) and UserTable.deletedAt.isNull() }) {
+                    it[UserTable.passwordHash] = passwordHash
+                    it[updatedAt] = now
+                }
+
+            if (rowsWritten > 0) {
+                RefreshTokenTable.update({
+                    (RefreshTokenTable.userId eq userId) and RefreshTokenTable.revokedAt.isNull()
+                }) {
+                    it[revokedAt] = now
+                }
+            }
+
+            rowsWritten > 0
         }
 
     suspend fun createWithPassword(
