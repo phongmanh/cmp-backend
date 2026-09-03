@@ -4,6 +4,7 @@ import com.example.common.AppConfig
 import com.example.common.createDataSource
 import com.example.common.runMigrations
 import com.example.common.toAppConfig
+import com.example.configureSerialization
 import com.example.feature.auth.authRoutes
 import com.example.feature.auth.social.SocialIdentityVerifier
 import com.example.feature.auth.social.SocialVerifierRegistry
@@ -14,7 +15,6 @@ import com.example.plugins.configureHttp
 import com.example.plugins.configureRequestValidation
 import com.example.plugins.configureSecurity
 import com.example.plugins.configureStatusPages
-import configureSerialization
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
