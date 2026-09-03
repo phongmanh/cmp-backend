@@ -1,0 +1,53 @@
+# syntax=docker/dockerfile:1
+
+# The image Vercel builds and runs as a Function. It differs from the plain `Dockerfile` in three
+# ways, all forced by the platform:
+#
+#   - No HEALTHCHECK. Vercel decides liveness from the HTTP server answering on $PORT, and the
+#     runtime image carries no curl to run one with.
+#   - An entrypoint script, because the Neon integration injects a libpq URL under the same name
+#     the application reads as a JDBC one. See docker-entrypoint.vercel.sh.
+#   - No BuildKit cache mounts. Each Vercel build starts cold, so a cache mount buys nothing and
+#     only hides the real dependency-download cost from the build log.
+#
+# Keep it in step with `Dockerfile`; the two describe the same application.
+
+FROM eclipse-temurin:21-jdk AS build
+
+WORKDIR /workspace
+
+# Build files first: they change far less often than sources, so the Gradle distribution and the
+# dependency download stay cached when only Kotlin code changes.
+COPY gradlew ./
+COPY gradle/ gradle/
+COPY settings.gradle.kts build.gradle.kts gradle.properties ./
+# The build is a two module one: the server depends on :shared, so its build file belongs in the
+# cached layer and its sources next to the server's.
+COPY shared/build.gradle.kts shared/
+RUN ./gradlew --no-daemon --quiet --version
+
+COPY shared/src/ shared/src/
+COPY src/ src/
+# Tests need a Docker daemon for Testcontainers, which is not available inside a build.
+RUN ./gradlew --no-daemon --quiet buildFatJar -x test \
+    && cp build/libs/*-all.jar /workspace/app.jar
+
+# Runtime stage. JRE only, no build tooling, no sources.
+FROM eclipse-temurin:21-jre AS runtime
+
+RUN groupadd --system app && useradd --system --gid app --home /app app
+
+WORKDIR /app
+COPY --from=build --chown=app:app /workspace/app.jar /app/app.jar
+COPY --chown=app:app docker-entrypoint.vercel.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+USER app
+
+# Vercel routes to port 80 unless PORT says otherwise, and a non-root process cannot bind 80.
+# Set PORT=8080 in the project's environment variables so both ends agree.
+EXPOSE 8080
+
+# MaxRAMPercentage keeps the heap inside whatever limit the container is given.
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]

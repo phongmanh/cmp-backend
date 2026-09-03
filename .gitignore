@@ -11,3 +11,9 @@ build/
 .idea/
 
 .claude/settings.local.json
+
+.vercel/
+.vercel
+.env*
+
+.DS_Store
