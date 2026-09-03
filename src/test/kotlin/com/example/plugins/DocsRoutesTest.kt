@@ -94,6 +94,7 @@ class DocsRoutesTest {
                     "post /api/v1/auth/link",
                     "get /api/v1/users/me",
                     "put /api/v1/users/me",
+                    "get /api/v1/users/{userId}",
                 ),
                 secured,
             )

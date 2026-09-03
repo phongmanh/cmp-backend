@@ -24,6 +24,7 @@ object ErrorCode {
     const val UNAUTHENTICATED = "UNAUTHENTICATED"
     const val FORBIDDEN = "FORBIDDEN"
     const val NOT_FOUND = "NOT_FOUND"
+    const val METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     const val CONFLICT = "CONFLICT"
     const val PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
     const val INTERNAL_ERROR = "INTERNAL_ERROR"

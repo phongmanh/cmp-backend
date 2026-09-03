@@ -97,6 +97,7 @@ private val API_DESCRIPTION =
     | `UNAUTHENTICATED` | 401 | No token, a bad token, bad credentials, or a dead refresh token. |
     | `FORBIDDEN` | 403 | The token is valid but the caller may not touch this resource. |
     | `NOT_FOUND` | 404 | The resource does not exist. |
+    | `METHOD_NOT_ALLOWED` | 405 | The path exists but does not answer that verb. |
     | `CONFLICT` | 409 | The email is taken, or the social account belongs to somebody else. |
     | `PAYLOAD_TOO_LARGE` | 413 | The body is over 64 KB. |
     | `PROVIDER_NOT_ENABLED` | 422 | That social provider is not configured on this deployment. |

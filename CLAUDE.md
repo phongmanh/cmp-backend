@@ -77,7 +77,7 @@ Traffic flows one direction only: **route → service → repository → databas
 - Every route lives under `/api/v1`. A breaking change means a new version folder, never a silent change to v1.
 - Requests and responses use dedicated DTO classes marked `@Serializable`. Never expose an Exposed entity or an internal domain object directly on the wire.
 - Never put a password hash, internal identifier, or audit column in a response DTO.
-- Status codes: `200` read, `201` create with a `Location` header, `204` delete, `400` bad input, `401` missing or bad token, `403` valid token but not allowed, `404` not found, `409` conflict, `422` valid shape but broken business rule.
+- Status codes: `200` read, `201` create with a `Location` header, `204` delete, `400` bad input, `401` missing or bad token, `403` valid token but not allowed, `404` not found, `405` wrong method for the path, `409` conflict, `422` valid shape but broken business rule.
 - All errors return the same body shape, produced by `StatusPages` in one place:
 
 ```kotlin

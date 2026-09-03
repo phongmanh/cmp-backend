@@ -18,11 +18,13 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 private const val VALID_PASSWORD = "a-long-enough-password"
@@ -147,6 +149,80 @@ class UserRoutesTest {
                 }
 
             assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+    @Test
+    fun `reads the caller's own profile by id`() =
+        authTestApplication {
+            val client = jsonClient()
+            val tokens = client.register(uniqueEmail(), VALID_PASSWORD, "Ada", AVATAR_URL).body<TokenResponse>()
+
+            val response = client.get(ApiRoutes.Users.byId(tokens.user.id)) { bearerAuth(tokens.accessToken) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(tokens.user.id, response.body<UserResponse>().id)
+        }
+
+    @Test
+    fun `the location header a registration returns resolves`() =
+        authTestApplication {
+            val client = jsonClient()
+            val created = client.register(uniqueEmail(), VALID_PASSWORD, "Ada")
+            val tokens = created.body<TokenResponse>()
+            val location = created.headers[HttpHeaders.Location]
+
+            assertNotNull(location, "register must say where the account it made can be read")
+            val response = client.get(location) { bearerAuth(tokens.accessToken) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(tokens.user.id, response.body<UserResponse>().id)
+        }
+
+    @Test
+    fun `another account's id reads as missing`() =
+        authTestApplication {
+            val client = jsonClient()
+            val mine = client.register(uniqueEmail(), VALID_PASSWORD, "Ada").body<TokenResponse>()
+            val theirs = client.register(uniqueEmail(), VALID_PASSWORD, "Grace").body<TokenResponse>()
+
+            val response = client.get(ApiRoutes.Users.byId(theirs.user.id)) { bearerAuth(mine.accessToken) }
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+            assertEquals("NOT_FOUND", response.body<ErrorResponse>().code)
+        }
+
+    @Test
+    fun `rejects an id that is not a uuid`() =
+        authTestApplication {
+            val client = jsonClient()
+            val tokens = client.register(uniqueEmail(), VALID_PASSWORD).body<TokenResponse>()
+
+            val response = client.get(ApiRoutes.Users.byId("not-a-uuid")) { bearerAuth(tokens.accessToken) }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("VALIDATION_ERROR", response.body<ErrorResponse>().code)
+        }
+
+    @Test
+    fun `returns 401 when reading by id without a token`() =
+        authTestApplication {
+            val response = jsonClient().get(ApiRoutes.Users.byId("11111111-1111-1111-1111-111111111111"))
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+    @Test
+    fun `me is still the current user route and not an id`() =
+        authTestApplication {
+            val client = jsonClient()
+            val tokens = client.register(uniqueEmail(), VALID_PASSWORD, "Ada").body<TokenResponse>()
+
+            // A literal segment outranks a parameter one, so `me` must not reach the id template and
+            // fail as a malformed UUID.
+            val response = client.get(ApiRoutes.Users.ME) { bearerAuth(tokens.accessToken) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(tokens.user.id, response.body<UserResponse>().id)
         }
 }
 

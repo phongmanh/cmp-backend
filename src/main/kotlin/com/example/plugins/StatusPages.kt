@@ -52,6 +52,26 @@ fun Application.configureStatusPages() {
             )
         }
 
+        // An unmatched path never throws: routing records a failure status and the engine's fallback
+        // answers with a bare code. A status handler is the only hook that reaches it, and StatusPages
+        // marks a call before running an exception handler, so a thrown 404 keeps its own message.
+        status(HttpStatusCode.NotFound) { call, _ ->
+            call.respond(
+                HttpStatusCode.NotFound,
+                ErrorResponse(ErrorCode.NOT_FOUND, "No endpoint matches that path."),
+            )
+        }
+
+        // The path matched and the verb did not, which fails routing the same bare way a miss does.
+        // No `Allow` header: routing does not report which verbs the path answers, and reconstructing
+        // that means walking the route tree, which is more than this shape is worth.
+        status(HttpStatusCode.MethodNotAllowed) { call, _ ->
+            call.respond(
+                HttpStatusCode.MethodNotAllowed,
+                ErrorResponse(ErrorCode.METHOD_NOT_ALLOWED, "That method is not allowed on this path."),
+            )
+        }
+
         exception<Throwable> { call, cause ->
             // The detail belongs in the server log; the client gets nothing it could probe with.
             call.application.log.error("Unhandled failure while serving ${call.request.local.uri}", cause)
