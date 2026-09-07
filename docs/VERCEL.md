@@ -62,6 +62,7 @@ Everything arrives as an environment variable, set per environment in the projec
 | `DATABASE_MAX_POOL_SIZE` | `3` | Per instance, and instances multiply. See [Sizing the pool](#5-the-database). |
 | `TRUST_PROXY_HEADERS` | `true` | Makes the auth rate limiter read the real client IP. See below. |
 | `JWT_SECRET` | `openssl rand -base64 48` | Use a different value per environment, and never the one from your laptop's `.env`. |
+| `PUBLIC_BASE_URL` | `https://<your-deployment>` | The public origin, no trailing slash. Every avatar URL is built on it, so a wrong value serves broken images rather than failing loudly. Required. |
 
 `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_REALM`, `CORS_ALLOWED_ORIGINS` and the social provider variables
 behave exactly as they do in the Docker deployment.
@@ -192,6 +193,7 @@ What Vercel changes:
 |---|---|---|
 | `FUNCTION_INVOCATION_FAILED`, exit `127`, `exec: java: not found` | `PATH` did not survive into the container | The entrypoint rebuilds it from `JAVA_HOME`; check that edit is still present |
 | `Missing required configuration 'database.url'` | `DATABASE_URL` is not set for this environment | Set it, and confirm with `vercel env ls` that it lists the environment you deployed |
+| `Missing required configuration 'app.publicBaseUrl'` | `PUBLIC_BASE_URL` is not set for this environment | Set it to the deployment's public origin, no trailing slash |
 | `Module function cannot be found for the fully qualified name …` | A module in `application.yaml` does not match the compiled class | The file is missing its `package` declaration, or sits outside `com/example/` |
 | Deployment `Ready` but every request 500s | The container crashes at start-up | `vercel logs <url>` after making a request; a container that was never invoked logs nothing |
 | A plain `curl` returns a login page | Deployment Protection | `vercel curl <url>` |

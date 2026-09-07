@@ -1,5 +1,6 @@
 package com.example.plugins
 
+import com.example.api.ApiRoutes
 import com.example.api.auth.ChangePasswordRequest
 import com.example.api.auth.LoginRequest
 import com.example.api.auth.RefreshTokenRequest
@@ -15,6 +16,7 @@ import io.ktor.server.application.install
 import io.ktor.server.plugins.requestvalidation.RequestValidation
 import io.ktor.server.plugins.requestvalidation.ValidationResult
 import io.ktor.server.request.header
+import io.ktor.server.request.path
 
 // The numbers live in the shared contract so the app can refuse the same values before spending a
 // round trip on them. Only the wording below is server-side.
@@ -31,14 +33,29 @@ private val EMAIL_PATTERN = FieldLimits.EMAIL_PATTERN
 private val AVATAR_URL_PATTERN = FieldLimits.AVATAR_URL_PATTERN
 
 /**
+ * Paths that carry something other than a JSON document and need their own ceiling.
+ *
+ * A lookup rather than a route-scoped plugin because this one runs before routing resolves, so it
+ * has a path and never a matched route. The consequences are small and fail closed: a request whose
+ * spelling differs from the constant — a different case, a trailing slash — still routes but misses
+ * the exemption and is refused, which is the safe direction to be wrong in.
+ */
+private val EXEMPT_PATHS: Map<String, Long> =
+    mapOf(ApiRoutes.Users.ME_AVATAR to FieldLimits.MAX_AVATAR_REQUEST_BYTES)
+
+/**
  * Rejects an oversized body before it is read into memory.
+ *
+ * Only an early exit, not the whole defence: a chunked request declares no length at all, so
+ * anything that reads a body of its own has to enforce its own limit as it streams.
  */
 val BodySizeLimit =
     createApplicationPlugin("BodySizeLimit") {
         onCall { call ->
-            val declaredLength = call.request.header(HttpHeaders.ContentLength)?.toLongOrNull()
-            if (declaredLength != null && declaredLength > MAX_BODY_BYTES) {
-                throw PayloadTooLargeException("The request body is larger than the ${MAX_BODY_BYTES / 1024} KB limit.")
+            val declaredLength = call.request.header(HttpHeaders.ContentLength)?.toLongOrNull() ?: return@onCall
+            val limit = EXEMPT_PATHS[call.request.path()] ?: MAX_BODY_BYTES
+            if (declaredLength > limit) {
+                throw PayloadTooLargeException("The request body is larger than the ${limit / 1024} KB limit.")
             }
         }
     }

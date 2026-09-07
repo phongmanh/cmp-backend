@@ -8,6 +8,7 @@ import com.example.configureSerialization
 import com.example.feature.auth.authRoutes
 import com.example.feature.auth.social.SocialIdentityVerifier
 import com.example.feature.auth.social.SocialVerifierRegistry
+import com.example.feature.image.imageRoutes
 import com.example.feature.user.userRoutes
 import com.example.plugins.appModule
 import com.example.plugins.configureDocs
@@ -32,6 +33,15 @@ import java.util.UUID
 /** Obviously fake, and only ever read by tests running against a throwaway container. */
 private const val TEST_SIGNING_KEY = "test-signing-key-for-unit-tests-only"
 
+/**
+ * What the test host answers on, and so the prefix on every avatar URL a test reads back.
+ *
+ * No port: the test engine serves `localhost:80` and `localhost:443`, so naming a port here would
+ * publish addresses the test client refuses to resolve. Keeping it resolvable is what lets a test
+ * take the `avatarUrl` out of a response and fetch it, exactly as an app would.
+ */
+const val TEST_PUBLIC_BASE_URL = "http://localhost"
+
 fun testAppConfig(): AppConfig {
     val container = TestPostgres.container
     return MapApplicationConfig(
@@ -46,6 +56,7 @@ fun testAppConfig(): AppConfig {
         "database.password" to container.password,
         "database.maxPoolSize" to "4",
         "database.shouldRunMigrations" to "true",
+        "app.publicBaseUrl" to TEST_PUBLIC_BASE_URL,
         // Cheap on purpose: the cost factor is a production concern, not a test one.
         "security.bcryptCost" to "4",
     ).toAppConfig()
@@ -99,6 +110,7 @@ fun authTestApplication(
             configureDocs()
             authRoutes()
             userRoutes()
+            imageRoutes()
         }
 
         block()

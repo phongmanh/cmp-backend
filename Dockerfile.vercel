@@ -50,4 +50,4 @@ EXPOSE 8080
 
 # MaxRAMPercentage keeps the heap inside whatever limit the container is given.
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]
+CMD ["java", "-XX:MaxRAMPercentage=75.0", "-Djava.awt.headless=true", "-jar", "/app/app.jar"]

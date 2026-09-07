@@ -17,6 +17,13 @@ ktor:
       - com.example.plugins.DocsKt.configureDocs
       - com.example.feature.auth.AuthRoutesKt.authRoutes
       - com.example.feature.user.UserRoutesKt.userRoutes
+      - com.example.feature.image.ImageRoutesKt.imageRoutes
+
+# The absolute address clients reach this server on, with no trailing slash. Every avatar URL the
+# API publishes is built on it, so a wrong value hands the app pictures it cannot load. There is no
+# default: the server cannot guess its own public name, and guessing wrong fails silently.
+app:
+  publicBaseUrl: "$PUBLIC_BASE_URL:"
 
 # Only the names of the environment variables live here. Values are supplied by the environment and
 # the application refuses to start when a required one is missing.

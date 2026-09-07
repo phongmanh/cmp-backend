@@ -5,6 +5,7 @@ import com.example.common.AppConfig
 import com.example.common.DatabaseConfig
 import com.example.common.JwtConfig
 import com.example.common.SocialConfig
+import com.example.support.TEST_PUBLIC_BASE_URL
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.client.request.options
@@ -154,6 +155,7 @@ private fun corsAppConfig(allowedOrigins: List<String>): AppConfig =
                 shouldRunMigrations = false,
             ),
         social = SocialConfig(google = null, facebook = null),
+        publicBaseUrl = TEST_PUBLIC_BASE_URL,
         allowedOrigins = allowedOrigins,
         bcryptCost = 4,
         shouldTrustProxyHeaders = false,

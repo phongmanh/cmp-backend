@@ -2,10 +2,14 @@ package com.example.plugins
 
 import com.example.common.AppConfig
 import com.example.feature.auth.AUTH_RATE_LIMIT
+import com.example.feature.user.UPLOAD_RATE_LIMIT
+import com.example.feature.user.UPLOAD_REQUESTS_PER_WINDOW
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.defaultheaders.DefaultHeaders
 import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
@@ -55,6 +59,19 @@ fun Application.configureHttp() {
         register(RateLimitName(AUTH_RATE_LIMIT)) {
             rateLimiter(limit = AUTH_REQUESTS_PER_WINDOW, refillPeriod = 1.minutes)
             requestKey { call -> call.request.origin.remoteAddress }
+        }
+
+        // Keyed on the account rather than the address, which the auth routes cannot do because
+        // nobody is signed in yet when they run. It means an office behind one address does not
+        // share a bucket, and that somebody cannot dodge the limit by changing networks.
+        register(RateLimitName(UPLOAD_RATE_LIMIT)) {
+            rateLimiter(limit = UPLOAD_REQUESTS_PER_WINDOW, refillPeriod = 1.minutes)
+            requestKey { call ->
+                // The route sits inside `authenticate`, so there is always a principal here. The
+                // address is a fallback that should never be reached, kept so a future caller that
+                // forgets the nesting is still limited by something.
+                call.principal<JWTPrincipal>()?.subject ?: call.request.origin.remoteAddress
+            }
         }
     }
 }

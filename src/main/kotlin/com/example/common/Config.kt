@@ -42,6 +42,8 @@ data class AppConfig(
     val jwt: JwtConfig,
     val database: DatabaseConfig,
     val social: SocialConfig,
+    /** Absolute, no trailing slash. Every avatar address the API publishes is built on it. */
+    val publicBaseUrl: String,
     val allowedOrigins: List<String>,
     val bcryptCost: Int,
     val shouldTrustProxyHeaders: Boolean,
@@ -67,6 +69,7 @@ fun ApplicationConfig.toAppConfig(): AppConfig =
                 shouldRunMigrations = boolean("database.shouldRunMigrations", true),
             ),
         social = socialConfig(),
+        publicBaseUrl = publicBaseUrl(),
         allowedOrigins = list("security.allowedOrigins"),
         bcryptCost = int("security.bcryptCost", 12),
         shouldTrustProxyHeaders = boolean("security.trustProxyHeaders", false),
@@ -93,6 +96,26 @@ private fun ApplicationConfig.socialConfig(): SocialConfig {
                 null
             },
     )
+}
+
+/**
+ * Where this deployment is reached from the outside.
+ *
+ * Required, and checked rather than merely read. The server cannot work this out for itself —
+ * behind a proxy the request it sees names the container, not the host the app dialled — and a
+ * wrong value fails silently in a way nothing else here does: the service is healthy, every
+ * response is well formed, and every avatar in the app is a broken image.
+ */
+private fun ApplicationConfig.publicBaseUrl(): String {
+    val raw = required("app.publicBaseUrl", "PUBLIC_BASE_URL")
+
+    if (!raw.startsWith("http://") && !raw.startsWith("https://")) {
+        error("Configuration 'app.publicBaseUrl' must be an absolute http or https URL. Set PUBLIC_BASE_URL.")
+    }
+    if (raw.endsWith("/")) {
+        error("Configuration 'app.publicBaseUrl' must not end with a slash. Set PUBLIC_BASE_URL.")
+    }
+    return raw
 }
 
 private fun ApplicationConfig.optional(path: String): String? = propertyOrNull(path)?.getString()?.takeIf { it.isNotBlank() }

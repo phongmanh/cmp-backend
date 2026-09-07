@@ -30,6 +30,21 @@ class ApiContractTest {
     fun `byId fills the template the server registers`() {
         assertEquals("/api/v1/users/{userId}", ApiRoutes.Users.BY_ID)
         assertEquals("/api/v1/users/abc-123", ApiRoutes.Users.byId("abc-123"))
+        assertEquals("/api/v1/images/{imageId}", ApiRoutes.Images.BY_ID)
+        assertEquals("/api/v1/images/abc-123", ApiRoutes.Images.byId("abc-123"))
+    }
+
+    @Test
+    fun `the avatar endpoint hangs off the current user`() {
+        assertEquals("/api/v1/users/me/avatar", ApiRoutes.Users.ME_AVATAR)
+    }
+
+    @Test
+    fun `the request cap leaves room for the multipart envelope`() {
+        assertTrue(
+            FieldLimits.MAX_AVATAR_REQUEST_BYTES > FieldLimits.MAX_AVATAR_BYTES,
+            "a file of exactly MAX_AVATAR_BYTES has to fit inside the request that carries it",
+        )
     }
 
     @Test

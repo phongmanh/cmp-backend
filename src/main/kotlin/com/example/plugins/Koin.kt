@@ -11,6 +11,8 @@ import com.example.feature.auth.social.FacebookIdentityVerifier
 import com.example.feature.auth.social.GoogleIdentityVerifier
 import com.example.feature.auth.social.SocialIdentityVerifier
 import com.example.feature.auth.social.SocialVerifierRegistry
+import com.example.feature.image.ImageRepository
+import com.example.feature.image.ImageService
 import com.example.feature.user.UserRepository
 import com.example.feature.user.UserService
 import io.ktor.client.HttpClient
@@ -53,6 +55,7 @@ fun appModule(appConfig: AppConfig): Module =
         }
 
         single { UserRepository() }
+        single { ImageRepository() }
         single { RefreshTokenRepository() }
         single { TokenService(appConfig.jwt) }
         single { PasswordHasher(appConfig.bcryptCost) }
@@ -66,4 +69,5 @@ fun appModule(appConfig: AppConfig): Module =
 
         single { AuthService(get(), get(), get(), get(), get()) }
         single { UserService(get()) }
+        single { ImageService(get(), get()) }
     }

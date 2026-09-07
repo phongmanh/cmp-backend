@@ -8,6 +8,7 @@ import com.example.api.auth.RegisterRequest
 import com.example.api.auth.SocialProvider
 import com.example.api.auth.SocialSignInRequest
 import com.example.api.auth.TokenResponse
+import com.example.common.AppConfig
 import com.example.common.BodyExample
 import com.example.common.badRequest
 import com.example.common.conflict
@@ -58,6 +59,7 @@ private const val RATE_LIMIT_NOTE = "Rate limited to 10 requests per minute per 
 
 @OptIn(ExperimentalKtorApi::class)
 fun Application.authRoutes() {
+    val appConfig by inject<AppConfig>()
     val authService by inject<AuthService>()
     val userService by inject<UserService>()
 
@@ -68,7 +70,7 @@ fun Application.authRoutes() {
                 val result =
                     authService.register(request.email, request.password, request.displayName, request.avatarUrl)
                 call.response.headers.append(HttpHeaders.Location, ApiRoutes.Users.byId(result.user.id.toString()))
-                call.respond(HttpStatusCode.Created, result.toResponse())
+                call.respond(HttpStatusCode.Created, result.toResponse(appConfig.publicBaseUrl))
             }.describe {
                 tag(AUTH_TAG)
                 operationId = "register"
@@ -112,7 +114,7 @@ fun Application.authRoutes() {
             post(ApiRoutes.Auth.LOGIN) {
                 val request = call.receive<LoginRequest>()
                 val result = authService.login(request.email, request.password)
-                call.respond(HttpStatusCode.OK, result.toResponse())
+                call.respond(HttpStatusCode.OK, result.toResponse(appConfig.publicBaseUrl))
             }.describe {
                 tag(AUTH_TAG)
                 operationId = "login"
@@ -141,7 +143,7 @@ fun Application.authRoutes() {
             post(ApiRoutes.Auth.SOCIAL) {
                 val request = call.receive<SocialSignInRequest>()
                 val result = authService.signInWithProvider(request.provider, request.token)
-                call.respond(HttpStatusCode.OK, result.toResponse())
+                call.respond(HttpStatusCode.OK, result.toResponse(appConfig.publicBaseUrl))
             }.describe {
                 tag(AUTH_TAG)
                 operationId = "signInWithProvider"
@@ -180,7 +182,7 @@ fun Application.authRoutes() {
             post(ApiRoutes.Auth.REFRESH) {
                 val request = call.receive<RefreshTokenRequest>()
                 val result = authService.refresh(request.refreshToken)
-                call.respond(HttpStatusCode.OK, result.toResponse())
+                call.respond(HttpStatusCode.OK, result.toResponse(appConfig.publicBaseUrl))
             }.describe {
                 tag(AUTH_TAG)
                 operationId = "refresh"
@@ -246,7 +248,7 @@ fun Application.authRoutes() {
                             request.currentPassword,
                             request.newPassword,
                         )
-                    call.respond(HttpStatusCode.OK, result.toResponse())
+                    call.respond(HttpStatusCode.OK, result.toResponse(appConfig.publicBaseUrl))
                 }.describe {
                     tag(AUTH_TAG)
                     operationId = "changePassword"
@@ -313,7 +315,7 @@ fun Application.authRoutes() {
                 val userId = call.requireUserId()
                 authService.linkProvider(userId, request.provider, request.token)
                 val profile = userService.profileOf(userId)
-                call.respond(HttpStatusCode.OK, profile.user.toResponse(profile.linkedProviders))
+                call.respond(HttpStatusCode.OK, profile.user.toResponse(appConfig.publicBaseUrl, profile.linkedProviders))
             }.describe {
                 tag(AUTH_TAG)
                 operationId = "linkProvider"
@@ -341,10 +343,10 @@ fun Application.authRoutes() {
     }
 }
 
-private fun AuthResult.toResponse(): TokenResponse =
+private fun AuthResult.toResponse(publicBaseUrl: String): TokenResponse =
     TokenResponse(
         accessToken = accessToken,
         refreshToken = refreshToken,
         expiresIn = expiresInSeconds,
-        user = user.toResponse(),
+        user = user.toResponse(publicBaseUrl),
     )

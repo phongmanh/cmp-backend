@@ -94,7 +94,13 @@ class DocsRoutesTest {
                     "post /api/v1/auth/link",
                     "get /api/v1/users/me",
                     "put /api/v1/users/me",
+                    "post /api/v1/users/me/avatar",
+                    "delete /api/v1/users/me/avatar",
                     "get /api/v1/users/{userId}",
+                    // `get /api/v1/images/{imageId}` is deliberately absent. Serving an avatar
+                    // needs no token: the id is a random UUID and standing in for the credential
+                    // is its whole job, which is what lets an ordinary image loader fetch one.
+                    // If it ever appears here, somebody has made it private and should mean to.
                 ),
                 secured,
             )
@@ -107,18 +113,56 @@ class DocsRoutesTest {
                 operations()
                     .filter { (_, operation) -> operation.containsKey("requestBody") }
                     .filter { (_, operation) ->
+                        // An upload declares `multipart/form-data` and nothing else. There is no
+                        // worked example to show for a file picker, so only JSON bodies are held to
+                        // this; `documents every request body it publishes` covers the rest.
                         val json =
                             operation
                                 .getValue("requestBody")
                                 .jsonObject
                                 .getValue("content")
-                                .jsonObject
-                                .getValue("application/json")
-                                .jsonObject
+                                .jsonObject["application/json"]
+                                ?.jsonObject
+                                ?: return@filter false
                         json["examples"]?.jsonObject.isNullOrEmpty() || json["schema"] == null
                     }.map { (name, _) -> name }
 
             assertTrue(bare.isEmpty(), "these request bodies have no example or no schema: $bare")
+        }
+
+    @Test
+    fun `documents every request body it publishes`() =
+        authTestApplication {
+            val contentless =
+                operations()
+                    .filter { (_, operation) -> operation.containsKey("requestBody") }
+                    .filter { (_, operation) ->
+                        operation
+                            .getValue("requestBody")
+                            .jsonObject["content"]
+                            ?.jsonObject
+                            .isNullOrEmpty()
+                    }.map { (name, _) -> name }
+
+            assertTrue(contentless.isEmpty(), "these request bodies declare no content type at all: $contentless")
+        }
+
+    @Test
+    fun `publishes the image endpoint as bytes rather than as json`() =
+        authTestApplication {
+            val image = operations().single { (name, _) -> name == "get /api/v1/images/{imageId}" }.second
+
+            val contentTypes =
+                image
+                    .getValue("responses")
+                    .jsonObject
+                    .getValue("200")
+                    .jsonObject
+                    .getValue("content")
+                    .jsonObject
+                    .keys
+
+            assertTrue("image/jpeg" in contentTypes, "an avatar is served as an image, got $contentTypes")
         }
 
     @Test

@@ -38,4 +38,4 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=5 \
     CMD curl --fail --silent http://127.0.0.1:${PORT:-8080}/ || exit 1
 
 # MaxRAMPercentage keeps the heap inside whatever limit the container is given.
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-Djava.awt.headless=true", "-jar", "/app/app.jar"]

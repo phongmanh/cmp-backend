@@ -14,6 +14,13 @@ object UserTable : UUIDTable("users") {
     val passwordHash = varchar("password_hash", 255).nullable()
     val displayName = varchar("display_name", 120).nullable()
     val avatarUrl = varchar("avatar_url", FieldLimits.MAX_AVATAR_URL_LENGTH).nullable()
+
+    /**
+     * A plain column rather than a `reference` to `ImageTable`, even though the migration declares
+     * the foreign key: describing it here too would make the two table objects wait on each other
+     * to initialise. A database constraint keeps this and [avatarUrl] from ever both being set.
+     */
+    val avatarImageId = uuid("avatar_image_id").nullable()
     val isEmailVerified = bool("is_email_verified")
     val isActive = bool("is_active")
     val createdAt = timestamp("created_at")

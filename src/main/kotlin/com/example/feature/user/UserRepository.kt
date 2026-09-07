@@ -2,8 +2,11 @@ package com.example.feature.user
 
 import com.example.common.dbQuery
 import com.example.feature.auth.RefreshTokenTable
+import com.example.feature.image.ImageTable
 import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.selectAll
@@ -108,7 +111,7 @@ class UserRepository {
                         it[createdAt] = now
                         it[updatedAt] = now
                     }.value
-            User(id, email, displayName, avatarUrl, isEmailVerified = false, isActive = true, createdAt = now)
+            User(id, email, displayName, avatarUrl, avatarImageId = null, isEmailVerified = false, isActive = true, createdAt = now)
         }
 
     /**
@@ -145,7 +148,7 @@ class UserRepository {
                 it[createdAt] = now
             }
 
-            User(id, email, displayName, avatarUrl, isEmailVerified, isActive = true, createdAt = now)
+            User(id, email, displayName, avatarUrl, avatarImageId = null, isEmailVerified, isActive = true, createdAt = now)
         }
 
     suspend fun findByIdentity(
@@ -204,22 +207,35 @@ class UserRepository {
         avatarUrl: String?,
     ): User? =
         dbQuery {
-            val rowsWritten =
-                UserTable.update({ (UserTable.id eq userId) and UserTable.deletedAt.isNull() }) {
-                    it[UserTable.displayName] = displayName
-                    it[UserTable.avatarUrl] = avatarUrl
-                    it[updatedAt] = Instant.now()
-                }
-
-            if (rowsWritten == 0) {
-                null
-            } else {
+            val account =
                 UserTable
                     .selectAll()
-                    .where { UserTable.id eq userId }
+                    .where { (UserTable.id eq userId) and UserTable.deletedAt.isNull() }
                     .singleOrNull()
-                    ?.toUser()
+                    ?: return@dbQuery null
+
+            val previousImage = account[UserTable.avatarImageId]
+
+            UserTable.update({ UserTable.id eq userId }) {
+                it[UserTable.displayName] = displayName
+                it[UserTable.avatarUrl] = avatarUrl
+                // This endpoint replaces the avatar outright, so an uploaded one is on its way out
+                // whatever arrives here. Clearing it in the same statement is also what keeps the
+                // two columns from both being set, which the database refuses.
+                it[avatarImageId] = null
+                it[updatedAt] = Instant.now()
             }
+
+            // Nothing refers to the old image any more. Deleting it here rather than leaving it is
+            // the difference between a table that holds one picture per account and one that keeps
+            // every picture every account ever set.
+            previousImage?.let { old -> ImageTable.deleteWhere { ImageTable.id eq old } }
+
+            UserTable
+                .selectAll()
+                .where { UserTable.id eq userId }
+                .singleOrNull()
+                ?.toUser()
         }
 
     suspend fun findLinkedProviders(userId: UUID): List<String> =
@@ -237,6 +253,7 @@ private fun ResultRow.toUser(): User =
         email = this[UserTable.email],
         displayName = this[UserTable.displayName],
         avatarUrl = this[UserTable.avatarUrl],
+        avatarImageId = this[UserTable.avatarImageId],
         isEmailVerified = this[UserTable.isEmailVerified],
         isActive = this[UserTable.isActive],
         createdAt = this[UserTable.createdAt],

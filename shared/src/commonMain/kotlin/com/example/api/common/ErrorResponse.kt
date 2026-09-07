@@ -34,4 +34,11 @@ object ErrorCode {
 
     /** The account signs in through a provider only, so there is no password to change. */
     const val PASSWORD_NOT_SET = "PASSWORD_NOT_SET"
+
+    /**
+     * The upload is not a picture this server will store: not a JPEG or a PNG, larger than it will
+     * open, or too damaged to read. One code rather than three because the client does the same
+     * thing about all of them — ask for a different file — and the message says which it was.
+     */
+    const val UNSUPPORTED_IMAGE = "UNSUPPORTED_IMAGE"
 }

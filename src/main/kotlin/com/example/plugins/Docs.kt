@@ -81,9 +81,13 @@ private val API_DESCRIPTION =
     - Every field name in JSON is `camelCase`.
     - Every timestamp is an ISO-8601 string in UTC, e.g. `2026-08-19T09:41:12.804Z`.
     - Every error, at every status code except `429`, uses the same `ErrorResponse` body.
-    - Request bodies are capped at 64 KB; a larger one is rejected with `413` before it is read.
+    - Request bodies are capped at 64 KB, except the avatar upload, which accepts 5 MB. A larger one
+      is rejected with `413` before it is read.
     - `linkedProviders` is always empty inside a token response. Call `GET /api/v1/users/me` when
       you need the providers linked to an account.
+    - `avatarUrl` is either an address somebody else hosts or one of this API's own
+      `/api/v1/images/{imageId}` addresses. Render it; do not parse it. Which of the two it is can
+      change whenever the user changes their picture.
 
     ## Error codes
 
@@ -99,9 +103,10 @@ private val API_DESCRIPTION =
     | `NOT_FOUND` | 404 | The resource does not exist. |
     | `METHOD_NOT_ALLOWED` | 405 | The path exists but does not answer that verb. |
     | `CONFLICT` | 409 | The email is taken, or the social account belongs to somebody else. |
-    | `PAYLOAD_TOO_LARGE` | 413 | The body is over 64 KB. |
+    | `PAYLOAD_TOO_LARGE` | 413 | The body is over 64 KB, or over 5 MB on the avatar upload. |
     | `PROVIDER_NOT_ENABLED` | 422 | That social provider is not configured on this deployment. |
     | `PASSWORD_NOT_SET` | 422 | The account signs in through a provider and has no password to change. |
+    | `UNSUPPORTED_IMAGE` | 422 | The upload is not a JPEG or PNG, is too large to open, or is unreadable. |
     | `INTERNAL_ERROR` | 500 | Something went wrong. Details stay in the server log. |
 
     ## Rate limiting
@@ -111,6 +116,31 @@ private val API_DESCRIPTION =
     token, because it checks a password and would otherwise be somewhere to guess one. Over the
     limit the server answers `429` with a `Retry-After` header and an empty body — this is the one
     response that does not use the `ErrorResponse` shape.
+
+    `POST /api/v1/users/me/avatar` allows **5 uploads per minute per account**. It is counted per
+    account rather than per IP, because it needs a token anyway and an office behind one address
+    should not share a bucket.
+
+    ## Avatars
+
+    An avatar is either a picture somebody else hosts, set by sending its address to
+    `PUT /api/v1/users/me`, or one this server stores, set by uploading it to
+    `POST /api/v1/users/me/avatar`. An account has one or the other, never both, and either way
+    `avatarUrl` is the single field that names it.
+
+    An upload is not stored as sent. It is decoded and re-encoded into a 512x512 JPEG, cropped from
+    the centre rather than squashed. That is what discards EXIF — the GPS coordinates a phone writes
+    into a camera roll among it — so the picture that comes back is never byte-identical to the one
+    that went up. The format is decided by reading the file's leading bytes; the `Content-Type` on
+    the part and the filename are ignored.
+
+    Setting an avatar any way retires whatever was there before, and a retired image is deleted. Its
+    address then answers `404`, exactly as one that was never issued does.
+
+    `GET /api/v1/images/{imageId}` needs no token. The id is unguessable and is the only credential
+    involved, which is what lets an ordinary image loader fetch an avatar. Because an address always
+    answers with the same bytes for as long as it answers at all, the response may be cached for a
+    year and never revalidated.
 
     ## Field rules
 
@@ -127,4 +157,6 @@ private val API_DESCRIPTION =
       used to replace itself.
     - `newPassword` — the `password` rules above, and it must differ from `currentPassword`.
     - `token` / `refreshToken` — at most 8192 characters.
+    - `file` — the one `multipart/form-data` part the avatar upload reads. At most 5 MB, a JPEG or a
+      PNG, and at most 12000 pixels on a side. Anything else is `422`.
     """.trimIndent()

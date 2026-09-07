@@ -26,6 +26,36 @@ object FieldLimits {
     /** Covers both a provider credential and one of our refresh tokens. */
     const val MAX_TOKEN_LENGTH = 8192
 
+    /** The name of the one part `POST /api/v1/users/me/avatar` reads. Anything else is refused. */
+    const val AVATAR_PART_NAME = "file"
+
+    /** The uploaded file itself. */
+    const val MAX_AVATAR_BYTES = 5 * 1024 * 1024L
+
+    /**
+     * The whole multipart request, which carries the boundary, the part headers and the epilogue on
+     * top of the file. Kept apart from [MAX_AVATAR_BYTES] because checking the envelope against the
+     * file's limit would refuse an upload of exactly the size we tell clients they may send.
+     */
+    const val MAX_AVATAR_REQUEST_BYTES = MAX_AVATAR_BYTES + 16 * 1024L
+
+    /** The edge of the square every avatar is re-encoded to. */
+    const val AVATAR_EDGE_PX = 512
+
+    /**
+     * The largest source the server will open. A decompression bomb is small on the wire and huge
+     * in memory — 20000 x 20000 is under a megabyte of PNG and 1.6 GB decoded — so the header is
+     * checked before any pixel is read.
+     */
+    const val MAX_AVATAR_SOURCE_EDGE_PX = 12_000
+
+    /**
+     * What an upload may be. The server decides by reading the file's leading bytes, never by
+     * trusting this against a declared `Content-Type` or a filename, both of which the client
+     * writes. Published so the app can refuse an obviously wrong pick before spending the upload.
+     */
+    val ALLOWED_AVATAR_UPLOAD_TYPES = listOf("image/jpeg", "image/png")
+
     val EMAIL_PATTERN = Regex("^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}$")
 
     /**

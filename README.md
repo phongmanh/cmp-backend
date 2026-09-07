@@ -37,6 +37,9 @@ Facebook SDK and exchanges it here for our own tokens; the backend never runs an
 | POST | `/api/v1/auth/link` | access token | Attach a provider account to the signed-in user |
 | GET | `/api/v1/users/me` | access token | The caller's own profile |
 | PUT | `/api/v1/users/me` | access token | Replace the caller's display name and avatar |
+| POST | `/api/v1/users/me/avatar` | access token | Upload an image and make it the caller's avatar |
+| DELETE | `/api/v1/users/me/avatar` | access token | Remove the caller's avatar |
+| GET | `/api/v1/images/{imageId}` | **public** | Serve a stored image |
 
 Access tokens live 15 minutes. Refresh tokens are opaque, stored only as a SHA-256 digest, and
 rotate on every use: presenting a token that was already spent revokes the whole login.
@@ -65,6 +68,28 @@ application refuses to start when a required one is missing.
 | `FACEBOOK_APP_SECRET` | no | — | |
 | `CORS_ALLOWED_ORIGINS` | no | none | Comma separated exact origins |
 | `BCRYPT_COST` | no | `12` | |
+| `PUBLIC_BASE_URL` | **yes** | — | Absolute, no trailing slash. Prefixes every avatar URL the API publishes |
+
+### Avatars
+
+An account's avatar is either a picture somebody else hosts — the address a social provider handed
+over at sign-in, set through `PUT /api/v1/users/me` — or one this server stores, uploaded to
+`POST /api/v1/users/me/avatar`. Never both: a database constraint enforces it, and `avatarUrl` is
+the one field naming whichever it is.
+
+An upload is not kept as sent. It is decoded and re-encoded into a 512×512 JPEG, cropped from the
+centre, which is what discards EXIF and the GPS coordinates a phone writes into a camera roll. The
+format is decided by reading the file's leading bytes, so neither the declared `Content-Type` nor
+the filename can smuggle another kind of file past. Uploads are capped at 5 MB and rate limited to
+5 per minute per account.
+
+Setting an avatar any way retires the previous one, and a retired image is deleted rather than left
+unreachable, so the table holds one picture per account rather than every picture ever set.
+
+`GET /api/v1/images/{imageId}` needs no token — the unguessable id is the credential, which is what
+lets an ordinary image loader fetch an avatar and a CDN cache it. Bytes live in Postgres today,
+behind `ImageRepository`; moving them to an object store replaces that one class and leaves the
+addresses clients already hold working.
 
 Route and repository tests run against a real Postgres through Testcontainers, so a running Docker
 daemon is needed; they are skipped rather than failed when there is none.

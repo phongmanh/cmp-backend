@@ -30,6 +30,9 @@ object ApiRoutes {
 
         const val ME = "$PATH/me"
 
+        /** Multipart upload on `POST`, removal on `DELETE`. Always acts on the token's subject. */
+        const val ME_AVATAR = "$ME/avatar"
+
         /** The name of the path parameter in [BY_ID], so a server never spells it twice. */
         const val USER_ID = "userId"
 
@@ -37,5 +40,24 @@ object ApiRoutes {
         const val BY_ID = "$PATH/{$USER_ID}"
 
         fun byId(userId: String): String = "$PATH/$userId"
+    }
+
+    /**
+     * Stored images, uploaded through [Users.ME_AVATAR] and served back from here.
+     *
+     * Unlike everything else under this object these paths need no access token: the id is a
+     * random UUID and standing in for the credential is its whole job, so an image loader can
+     * fetch one the way it fetches any other URL.
+     */
+    object Images {
+        const val PATH = "$API_PREFIX/images"
+
+        /** The name of the path parameter in [BY_ID], so a server never spells it twice. */
+        const val IMAGE_ID = "imageId"
+
+        /** Registration template. Use [byId] to build the path a client actually calls. */
+        const val BY_ID = "$PATH/{$IMAGE_ID}"
+
+        fun byId(imageId: String): String = "$PATH/$imageId"
     }
 }

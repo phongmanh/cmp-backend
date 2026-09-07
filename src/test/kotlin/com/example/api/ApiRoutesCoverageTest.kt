@@ -49,8 +49,11 @@ class ApiRoutesCoverageTest {
         assertTrue(ApiRoutes.Auth.REGISTER in paths, "expected the register endpoint")
         assertTrue(ApiRoutes.Users.ME in paths, "expected the current user endpoint")
         assertTrue(ApiRoutes.Users.BY_ID in paths, "expected the user by id template")
+        assertTrue(ApiRoutes.Users.ME_AVATAR in paths, "expected the avatar endpoint")
+        assertTrue(ApiRoutes.Images.BY_ID in paths, "expected the image by id template")
         assertTrue("PATH" !in names, "a group prefix is a namespace, not an endpoint")
         assertTrue(ApiRoutes.Users.USER_ID !in paths, "a parameter name is not a path")
+        assertTrue(ApiRoutes.Images.IMAGE_ID !in paths, "a parameter name is not a path")
     }
 }
 
@@ -63,7 +66,7 @@ class ApiRoutesCoverageTest {
  * `kotlin-reflect` on the test classpath.
  */
 private fun declaredEndpoints(): List<Pair<String, String>> =
-    listOf(ApiRoutes.Auth, ApiRoutes.Users).flatMap { group ->
+    listOf(ApiRoutes.Auth, ApiRoutes.Users, ApiRoutes.Images).flatMap { group ->
         group::class.java.declaredFields
             .filterNot { it.isSynthetic }
             .filter { it.type == String::class.java && it.name != "PATH" }

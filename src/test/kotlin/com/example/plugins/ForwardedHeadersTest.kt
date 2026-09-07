@@ -6,6 +6,7 @@ import com.example.common.DatabaseConfig
 import com.example.common.JwtConfig
 import com.example.common.SocialConfig
 import com.example.feature.auth.AUTH_RATE_LIMIT
+import com.example.support.TEST_PUBLIC_BASE_URL
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.statement.HttpResponse
@@ -138,6 +139,7 @@ private fun rateLimitAppConfig(shouldTrustProxyHeaders: Boolean): AppConfig =
                 shouldRunMigrations = false,
             ),
         social = SocialConfig(google = null, facebook = null),
+        publicBaseUrl = TEST_PUBLIC_BASE_URL,
         allowedOrigins = emptyList(),
         bcryptCost = 4,
         shouldTrustProxyHeaders = shouldTrustProxyHeaders,

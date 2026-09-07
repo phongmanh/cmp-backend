@@ -31,6 +31,10 @@ Fill in the two blanks:
 | `JWT_SECRET` | `openssl rand -base64 48` | Signs every access token. Changing it invalidates all outstanding tokens. |
 | `POSTGRES_PASSWORD` | `openssl rand -hex 16` | Used by both the `db` service and the application. |
 
+`PUBLIC_BASE_URL` is also required and ships with a working local value. Change it for any
+deployment a phone reaches: it is the address clients dial, not the one the container binds, and
+every avatar URL the API publishes is built on it.
+
 `.env` is git-ignored and must stay that way — it is the one file in the tree that holds real
 credentials. The full variable list, including the optional ones, is in the
 [README configuration table](../README.md#configuration).
@@ -177,6 +181,7 @@ docker run -d --name ktor-sample \
   -e DATABASE_USER=ktor \
   -e DATABASE_PASSWORD \
   -e CORS_ALLOWED_ORIGINS="https://app.example.com" \
+  -e PUBLIC_BASE_URL="https://api.example.com" \
   registry.example.com/ktor-sample:1.0.0
 ```
 
@@ -222,6 +227,8 @@ image that worked.
 |---|---|---|
 | `required variable JWT_SECRET is missing a value` | No `.env`, or the value is blank | `cp env.example .env` and fill both blanks |
 | `Missing required configuration 'database.url'. Set the DATABASE_URL environment variable.` | The variable never reached the container | Check the `environment:` block, or the `-e` flags on `docker run` |
+| `Missing required configuration 'app.publicBaseUrl'.` | `PUBLIC_BASE_URL` is not set | Set it to the public origin, no trailing slash |
+| Avatars load as broken images in the app | `PUBLIC_BASE_URL` names the container rather than the public host | It is the address a phone dials, not the one the container binds. Set and restart |
 | `Facebook is half configured` | One of the two Facebook variables is set | Set both, or neither to disable the provider |
 | `Bind for 127.0.0.1:8080 failed: port is already allocated` | Something else holds the port | Set `APP_PORT` or `POSTGRES_PORT` in `.env` |
 | Container never turns `healthy` after setting `PORT` | — | The healthcheck follows `PORT`; make sure the platform routes to that same port |
