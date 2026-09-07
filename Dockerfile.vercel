@@ -5,8 +5,9 @@
 #
 #   - No HEALTHCHECK. Vercel decides liveness from the HTTP server answering on $PORT, and the
 #     runtime image carries no curl to run one with.
-#   - An entrypoint script, because the Neon integration injects a libpq URL under the same name
-#     the application reads as a JDBC one. See docker-entrypoint.vercel.sh.
+#   - An entrypoint script: the Neon integration injects a libpq URL under the same name the
+#     application reads as a JDBC one, and a preview's public base URL is only knowable at
+#     start-up. See docker-entrypoint.vercel.sh.
 #   - No BuildKit cache mounts. Each Vercel build starts cold, so a cache mount buys nothing and
 #     only hides the real dependency-download cost from the build log.
 #

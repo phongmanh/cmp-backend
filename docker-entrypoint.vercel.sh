@@ -1,5 +1,6 @@
 #!/bin/sh
-# Bridges the Neon integration's environment to the one the application expects.
+# Bridges Vercel's environment to the one the application expects. Two jobs: the database
+# credentials, and the public base URL.
 #
 # Neon injects DATABASE_URL as a libpq URL that carries the credentials inline:
 #
@@ -11,6 +12,8 @@
 #
 # To point at a database other than the injected one, set DATABASE_URL to a jdbc: URL: this leaves
 # a JDBC URL and its DATABASE_USER and DATABASE_PASSWORD untouched.
+#
+# The second job is PUBLIC_BASE_URL, which a preview cannot be told ahead of time; see below.
 set -eu
 
 # Vercel's container runtime does not carry the image's own ENV PATH into the process it starts, so
@@ -71,5 +74,41 @@ case "$source_url" in
         log "DATABASE_URL is neither a postgres:// nor a jdbc: URL, leaving it alone"
         ;;
 esac
+
+# Where this deployment is reached from the outside. The application requires PUBLIC_BASE_URL and
+# refuses to start without it: behind a proxy the request it sees names the container, not the host
+# the phone dialled, so it cannot work this out for itself. See Config.kt.
+#
+# An explicit value always wins, which is what production wants: the canonical name is a deliberate
+# choice and has to survive a new alias or a custom domain. A preview has no such fixed name, so
+# derive its own. Giving every environment one project-wide value is the trap here — previews then
+# publish avatar URLs on the production host, which never received the upload.
+if [ -n "${PUBLIC_BASE_URL:-}" ]; then
+    log "public base URL set explicitly, leaving it alone"
+else
+    case "${VERCEL_ENV:-}" in
+        production)
+            public_host="${VERCEL_PROJECT_PRODUCTION_URL:-}"
+            ;;
+        # The branch alias outlives any single deployment, so a URL handed out by an earlier preview
+        # still resolves. VERCEL_URL changes with every push.
+        preview)
+            public_host="${VERCEL_BRANCH_URL:-${VERCEL_URL:-}}"
+            ;;
+        *)
+            public_host=""
+            ;;
+    esac
+
+    if [ -n "$public_host" ]; then
+        # Vercel terminates TLS for every deployment domain, so the scheme is never in doubt.
+        export PUBLIC_BASE_URL="https://${public_host}"
+        log "public base URL derived as ${PUBLIC_BASE_URL}"
+    else
+        # Name the inputs: the application's own check reports only that the variable is missing,
+        # which is the wrong half of the story when it was meant to be derived here.
+        log "cannot derive a public base URL (VERCEL_ENV=${VERCEL_ENV:-unset}, VERCEL_URL=${VERCEL_URL:-unset})"
+    fi
+fi
 
 exec "$@"

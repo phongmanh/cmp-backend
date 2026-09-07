@@ -62,10 +62,27 @@ Everything arrives as an environment variable, set per environment in the projec
 | `DATABASE_MAX_POOL_SIZE` | `3` | Per instance, and instances multiply. See [Sizing the pool](#5-the-database). |
 | `TRUST_PROXY_HEADERS` | `true` | Makes the auth rate limiter read the real client IP. See below. |
 | `JWT_SECRET` | `openssl rand -base64 48` | Use a different value per environment, and never the one from your laptop's `.env`. |
-| `PUBLIC_BASE_URL` | `https://<your-deployment>` | The public origin, no trailing slash. Every avatar URL is built on it, so a wrong value serves broken images rather than failing loudly. Required. |
+| `PUBLIC_BASE_URL` | `https://<your-domain>` | The public origin, no trailing slash. Every avatar URL is built on it. Set it for production only; the entrypoint derives a preview's own from `VERCEL_URL`. See [Public base URL](#public-base-url). |
 
 `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_REALM`, `CORS_ALLOWED_ORIGINS` and the social provider variables
 behave exactly as they do in the Docker deployment.
+
+<a id="public-base-url"></a>
+### Public base URL
+
+The application refuses to start without `PUBLIC_BASE_URL`, because behind a proxy the request it
+sees names the container rather than the host the phone dialled. Every avatar URL is built on it.
+
+Setting one project-wide value is the trap: previews then publish avatar URLs on the production
+host, which never received the upload — the pictures 404 while everything else looks healthy. So:
+
+| Environment | Where the value comes from |
+|---|---|
+| Production | Set explicitly. The canonical name is a deliberate choice and must survive a new alias or a custom domain. |
+| Preview | Derived by the entrypoint from `VERCEL_BRANCH_URL`, falling back to `VERCEL_URL`. Leave it unset. |
+| Development | `http://localhost:8080`, matching `env.example`. |
+
+An explicit value always wins, so setting one anywhere overrides the derivation.
 
 ### `TRUST_PROXY_HEADERS` is a security setting, not a convenience
 
@@ -193,7 +210,9 @@ What Vercel changes:
 |---|---|---|
 | `FUNCTION_INVOCATION_FAILED`, exit `127`, `exec: java: not found` | `PATH` did not survive into the container | The entrypoint rebuilds it from `JAVA_HOME`; check that edit is still present |
 | `Missing required configuration 'database.url'` | `DATABASE_URL` is not set for this environment | Set it, and confirm with `vercel env ls` that it lists the environment you deployed |
-| `Missing required configuration 'app.publicBaseUrl'` | `PUBLIC_BASE_URL` is not set for this environment | Set it to the deployment's public origin, no trailing slash |
+| `Missing required configuration 'app.publicBaseUrl'` | Not set, and nothing to derive it from | The entrypoint logs `cannot derive a public base URL` with the inputs it saw; set `PUBLIC_BASE_URL` explicitly |
+| `'app.publicBaseUrl' must not end with a slash` | A hand-set value has a trailing `/` | Strip it. The check is deliberate, so the entrypoint does not paper over it |
+| Avatars 404 on a preview but work in production | A single project-wide `PUBLIC_BASE_URL` points previews at the production host | Remove it from the Preview environment and let the entrypoint derive one |
 | `Module function cannot be found for the fully qualified name …` | A module in `application.yaml` does not match the compiled class | The file is missing its `package` declaration, or sits outside `com/example/` |
 | Deployment `Ready` but every request 500s | The container crashes at start-up | `vercel logs <url>` after making a request; a container that was never invoked logs nothing |
 | A plain `curl` returns a login page | Deployment Protection | `vercel curl <url>` |
