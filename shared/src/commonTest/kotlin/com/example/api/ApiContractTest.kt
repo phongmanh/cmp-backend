@@ -5,12 +5,17 @@ import com.example.api.auth.SocialProvider
 import com.example.api.auth.SocialSignInRequest
 import com.example.api.auth.TokenResponse
 import com.example.api.common.FieldLimits
+import com.example.api.common.PageResponse
+import com.example.api.customer.CustomerRequest
+import com.example.api.customer.CustomerStatus
 import com.example.api.user.UpdateProfileRequest
 import com.example.api.user.UserResponse
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -111,5 +116,45 @@ class ApiContractTest {
         assertFalse(FieldLimits.AVATAR_URL_PATTERN.matches("javascript:alert(1)"))
         assertFalse(FieldLimits.AVATAR_URL_PATTERN.matches("data:image/png;base64,iVBORw0KGgo="))
         assertFalse(FieldLimits.AVATAR_URL_PATTERN.matches("//cdn.example.com/a.png"))
+    }
+
+    @Test
+    fun `customer paths fill the template the server registers`() {
+        assertEquals("/api/v1/customers", ApiRoutes.Customers.PATH)
+        assertEquals("/api/v1/customers/{customerId}", ApiRoutes.Customers.BY_ID)
+        assertEquals("/api/v1/customers/abc-123", ApiRoutes.Customers.byId("abc-123"))
+    }
+
+    @Test
+    fun `customer status travels as its lowercase key`() {
+        val encoded = json.encodeToString(CustomerRequest(firstName = "Ada", status = CustomerStatus.LEAD))
+
+        assertContains(encoded, """"status":"lead"""")
+        assertEquals(CustomerStatus.INACTIVE, CustomerStatus.fromKey("inactive"))
+        assertNull(CustomerStatus.fromKey("vip"))
+    }
+
+    @Test
+    fun `a customer request without a status is refused rather than defaulted`() {
+        assertFailsWith<SerializationException> { json.decodeFromString<CustomerRequest>("""{"firstName":"Ada"}""") }
+        assertFailsWith<SerializationException> {
+            json.decodeFromString<CustomerRequest>("""{"firstName":"Ada","status":"vip"}""")
+        }
+    }
+
+    @Test
+    fun `a last page says so with a null cursor`() {
+        val decoded = json.decodeFromString<PageResponse<String>>("""{"items":["a"],"nextCursor":null}""")
+
+        assertEquals(PageResponse(listOf("a"), null), decoded)
+    }
+
+    @Test
+    fun `the phone rule accepts only E164`() {
+        assertTrue(FieldLimits.PHONE_PATTERN.matches("+447700900123"))
+        assertFalse(FieldLimits.PHONE_PATTERN.matches("07700900123"))
+        assertFalse(FieldLimits.PHONE_PATTERN.matches("+44 7700 900123"))
+        assertFalse(FieldLimits.PHONE_PATTERN.matches("+0447700900123"))
+        assertFalse(FieldLimits.PHONE_PATTERN.matches("+1234567890123456"))
     }
 }

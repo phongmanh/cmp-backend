@@ -8,6 +8,7 @@ import com.example.configureSerialization
 import com.example.feature.auth.authRoutes
 import com.example.feature.auth.social.SocialIdentityVerifier
 import com.example.feature.auth.social.SocialVerifierRegistry
+import com.example.feature.customer.customerRoutes
 import com.example.feature.image.imageRoutes
 import com.example.feature.user.userRoutes
 import com.example.plugins.appModule
@@ -111,6 +112,7 @@ fun authTestApplication(
             authRoutes()
             userRoutes()
             imageRoutes()
+            customerRoutes()
         }
 
         block()

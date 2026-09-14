@@ -26,6 +26,27 @@ object FieldLimits {
     /** Covers both a provider credential and one of our refresh tokens. */
     const val MAX_TOKEN_LENGTH = 8192
 
+    const val DEFAULT_PAGE_SIZE = 20
+    const val MAX_PAGE_SIZE = 100
+
+    /** Far above anything the server issues, so only a value somebody made up can reach it. */
+    const val MAX_CURSOR_LENGTH = 256
+
+    const val MAX_CUSTOMER_NAME_LENGTH = 100
+    const val MAX_COMPANY_NAME_LENGTH = 200
+
+    /** A `+` and at most fifteen digits, which is all E.164 allows. */
+    const val MAX_PHONE_LENGTH = 16
+
+    const val MAX_ADDRESS_LINE_LENGTH = 200
+    const val MAX_CITY_LENGTH = 100
+    const val MAX_REGION_LENGTH = 100
+    const val MAX_POSTAL_CODE_LENGTH = 20
+    const val MAX_CUSTOMER_NOTES_LENGTH = 2000
+
+    /** The `?q=` a customer list is searched with. */
+    const val MAX_CUSTOMER_SEARCH_LENGTH = 100
+
     /** The name of the one part `POST /api/v1/users/me/avatar` reads. Anything else is refused. */
     const val AVATAR_PART_NAME = "file"
 
@@ -65,4 +86,17 @@ object FieldLimits {
      * the rest of which is encrypted.
      */
     val AVATAR_URL_PATTERN = Regex("^https://[^\\s<>\"]+$")
+
+    /**
+     * E.164. One format rather than whatever a person typed, so a stored number can be dialled or
+     * handed to an SMS provider without guessing which country it belongs to. Formatting it for
+     * display is the app's job.
+     */
+    val PHONE_PATTERN = Regex("^\\+[1-9][0-9]{6,14}$")
+
+    /**
+     * The shape of an ISO 3166-1 alpha-2 code. The server also checks the code is one that exists,
+     * which a pattern cannot express.
+     */
+    val COUNTRY_CODE_PATTERN = Regex("^[A-Z]{2}$")
 }

@@ -97,6 +97,11 @@ class DocsRoutesTest {
                     "post /api/v1/users/me/avatar",
                     "delete /api/v1/users/me/avatar",
                     "get /api/v1/users/{userId}",
+                    "post /api/v1/customers",
+                    "get /api/v1/customers",
+                    "get /api/v1/customers/{customerId}",
+                    "put /api/v1/customers/{customerId}",
+                    "delete /api/v1/customers/{customerId}",
                     // `get /api/v1/images/{imageId}` is deliberately absent. Serving an avatar
                     // needs no token: the id is a random UUID and standing in for the credential
                     // is its whole job, which is what lets an ordinary image loader fetch one.

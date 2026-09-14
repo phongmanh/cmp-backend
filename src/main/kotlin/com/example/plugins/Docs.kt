@@ -56,7 +56,7 @@ private fun apiInfo(): OpenApiInfo =
 
 private val API_DESCRIPTION =
     """
-    Authentication and user API for the mobile app.
+    Authentication, user and customer API for the mobile app.
 
     ## Authenticating
 
@@ -88,6 +88,9 @@ private val API_DESCRIPTION =
     - `avatarUrl` is either an address somebody else hosts or one of this API's own
       `/api/v1/images/{imageId}` addresses. Render it; do not parse it. Which of the two it is can
       change whenever the user changes their picture.
+    - Every list is paginated. Send `?limit=` (default 20, at most 100) and read `nextCursor` from
+      the response; send it back as `?cursor=` for the next page, until it comes back `null`. A
+      cursor is opaque, and a limit outside 1–100 is refused rather than clamped.
 
     ## Error codes
 
@@ -102,7 +105,7 @@ private val API_DESCRIPTION =
     | `FORBIDDEN` | 403 | The token is valid but the caller may not touch this resource. |
     | `NOT_FOUND` | 404 | The resource does not exist. |
     | `METHOD_NOT_ALLOWED` | 405 | The path exists but does not answer that verb. |
-    | `CONFLICT` | 409 | The email is taken, or the social account belongs to somebody else. |
+    | `CONFLICT` | 409 | The email is taken, the social account belongs to somebody else, or you already have a customer with that email. |
     | `PAYLOAD_TOO_LARGE` | 413 | The body is over 64 KB, or over 5 MB on the avatar upload. |
     | `PROVIDER_NOT_ENABLED` | 422 | That social provider is not configured on this deployment. |
     | `PASSWORD_NOT_SET` | 422 | The account signs in through a provider and has no password to change. |
@@ -142,6 +145,20 @@ private val API_DESCRIPTION =
     answers with the same bytes for as long as it answers at all, the response may be cached for a
     year and never revalidated.
 
+    ## Customers
+
+    A customer belongs to the account that created it. Every `/api/v1/customers` route needs a token
+    and only ever reaches the caller's own customers; somebody else's answers `404`, exactly like one
+    that never existed.
+
+    `PUT` replaces a customer outright: an optional field left out is cleared, and `status` is
+    required rather than defaulted. Deleting a customer removes it from every response at once and
+    frees its email for a new customer.
+
+    `GET /api/v1/customers` lists newest first, and takes `?status=` to narrow by status and `?q=` to
+    search. The search is a case-insensitive **prefix** of the first name, last name, company name or
+    email: `ada` and `love` both find Ada Lovelace, `ovelace` does not.
+
     ## Field rules
 
     Validation runs before a request reaches the service. The schemas below give the shape; these
@@ -157,6 +174,18 @@ private val API_DESCRIPTION =
       used to replace itself.
     - `newPassword` — the `password` rules above, and it must differ from `currentPassword`.
     - `token` / `refreshToken` — at most 8192 characters.
+    - `firstName` — required, at most 100 characters, never blank.
+    - `lastName` — optional, at most 100 characters, never blank when present.
+    - `companyName` — optional, at most 200 characters, never blank when present.
+    - customer `email` — optional, a valid address of at most 320 characters, trimmed and lowercased
+      before storage, and unique among your own live customers.
+    - `phone` — optional, E.164: a `+`, the country code and the number, with no spaces.
+    - `address` — optional. When present, `line1` and `city` are required, and `countryCode` must be
+      an upper case ISO 3166-1 alpha-2 code that exists, such as `GB`. `line1` and `line2` hold 200
+      characters, `city` and `region` 100, `postalCode` 20.
+    - `notes` — optional, at most 2000 characters.
+    - `status` — required, one of `lead`, `active`, `inactive`. Anything else is `400`.
+    - `q` — at most 100 characters.
     - `file` — the one `multipart/form-data` part the avatar upload reads. At most 5 MB, a JPEG or a
       PNG, and at most 12000 pixels on a side. Anything else is `422`.
     """.trimIndent()

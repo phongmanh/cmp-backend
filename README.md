@@ -40,6 +40,11 @@ Facebook SDK and exchanges it here for our own tokens; the backend never runs an
 | POST | `/api/v1/users/me/avatar` | access token | Upload an image and make it the caller's avatar |
 | DELETE | `/api/v1/users/me/avatar` | access token | Remove the caller's avatar |
 | GET | `/api/v1/images/{imageId}` | **public** | Serve a stored image |
+| POST | `/api/v1/customers` | access token | Create a customer owned by the caller |
+| GET | `/api/v1/customers` | access token | List the caller's customers, paginated, with `?status=` and `?q=` |
+| GET | `/api/v1/customers/{customerId}` | access token | Read one of the caller's customers |
+| PUT | `/api/v1/customers/{customerId}` | access token | Replace one of the caller's customers |
+| DELETE | `/api/v1/customers/{customerId}` | access token | Soft delete one of the caller's customers |
 
 Access tokens live 15 minutes. Refresh tokens are opaque, stored only as a SHA-256 digest, and
 rotate on every use: presenting a token that was already spent revokes the whole login.

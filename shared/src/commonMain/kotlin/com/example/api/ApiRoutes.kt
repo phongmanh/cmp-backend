@@ -60,4 +60,26 @@ object ApiRoutes {
 
         fun byId(imageId: String): String = "$PATH/$imageId"
     }
+
+    /**
+     * The signed-in account's customers. [PATH] itself is the collection: `POST` creates, `GET`
+     * lists. Every path here acts only on customers the token's subject owns.
+     */
+    object Customers {
+        const val PATH = "$API_PREFIX/customers"
+
+        /** The name of the path parameter in [BY_ID], so a server never spells it twice. */
+        const val CUSTOMER_ID = "customerId"
+
+        /** Registration template. Use [byId] to build the path a client actually calls. */
+        const val BY_ID = "$PATH/{$CUSTOMER_ID}"
+
+        fun byId(customerId: String): String = "$PATH/$customerId"
+
+        /** Narrows a list to one `CustomerStatus.key`. */
+        const val STATUS = "status"
+
+        /** Case-insensitive prefix of a first name, last name, company name or email. */
+        const val SEARCH = "q"
+    }
 }
