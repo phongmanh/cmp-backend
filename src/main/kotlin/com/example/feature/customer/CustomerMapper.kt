@@ -33,6 +33,7 @@ fun Customer.toResponse(): CustomerResponse =
         notes = details.notes,
         status = details.status.key,
         createdAt = createdAt.toString(),
+        updatedAt = updatedAt.toString(),
     )
 
 fun CustomerPage.toResponse(): PageResponse<CustomerResponse> =

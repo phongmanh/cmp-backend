@@ -155,6 +155,10 @@ private val API_DESCRIPTION =
     required rather than defaulted. Deleting a customer removes it from every response at once and
     frees its email for a new customer.
 
+    `updatedAt` equals `createdAt` until the first successful `PUT`, and moves forward with every one
+    after. A rejected `PUT` leaves it where it was, so a client holding a copy can compare the two to
+    tell whether it is stale.
+
     `GET /api/v1/customers` lists newest first, and takes `?status=` to narrow by status and `?q=` to
     search. The search is a case-insensitive **prefix** of the first name, last name, company name or
     email: `ada` and `love` both find Ada Lovelace, `ovelace` does not.

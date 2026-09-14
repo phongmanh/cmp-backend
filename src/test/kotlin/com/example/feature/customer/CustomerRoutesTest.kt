@@ -81,6 +81,7 @@ class CustomerRoutesTest {
             assertEquals("Prefers email.", body.notes)
             assertEquals("active", body.status)
             Instant.parse(body.createdAt)
+            assertEquals(body.createdAt, body.updatedAt, "a customer nobody has replaced was last updated when it was created")
 
             val location = assertNotNull(created.headers[HttpHeaders.Location], "create must say where the customer can be read")
             val reread = client.get(location) { bearerAuth(token) }
@@ -419,6 +420,36 @@ class CustomerRoutesTest {
             assertNull(replaced.email)
             assertNull(replaced.address)
             assertEquals(replaced, client.get(ApiRoutes.Customers.byId(customer.id)) { bearerAuth(token) }.body<CustomerResponse>())
+        }
+
+    @Test
+    fun `a replacement moves updatedAt forward and leaves createdAt alone`() =
+        authTestApplication {
+            val client = jsonClient()
+            val token = client.signedIn()
+            val customer = client.createCustomer(token, fullRequest()).body<CustomerResponse>()
+
+            val replaced = client.replaceCustomer(token, customer.id, fullRequest().copy(notes = "Renewal due.")).body<CustomerResponse>()
+
+            assertEquals(customer.createdAt, replaced.createdAt)
+            assertTrue(
+                Instant.parse(replaced.updatedAt).isAfter(Instant.parse(customer.updatedAt)),
+                "updatedAt went from ${customer.updatedAt} to ${replaced.updatedAt}",
+            )
+        }
+
+    @Test
+    fun `a rejected replacement leaves updatedAt alone`() =
+        authTestApplication {
+            val client = jsonClient()
+            val token = client.signedIn()
+            client.createCustomer(token, fullRequest(email = "ada@example.com"))
+            val grace = client.createCustomer(token, fullRequest(email = "grace@example.com")).body<CustomerResponse>()
+
+            client.replaceCustomer(token, grace.id, fullRequest(email = "ada@example.com"))
+            val reread = client.get(ApiRoutes.Customers.byId(grace.id)) { bearerAuth(token) }.body<CustomerResponse>()
+
+            assertEquals(grace.updatedAt, reread.updatedAt)
         }
 
     @Test

@@ -87,4 +87,9 @@ data class CustomerResponse(
     val status: String,
     /** ISO-8601 in UTC. */
     val createdAt: String,
+    /**
+     * ISO-8601 in UTC. Equal to [createdAt] until the first replace, and moved forward by every one
+     * after, so a client holding a copy can tell whether it is out of date.
+     */
+    val updatedAt: String,
 )
