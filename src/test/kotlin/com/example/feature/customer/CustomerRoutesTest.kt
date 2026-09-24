@@ -2,6 +2,7 @@ package com.example.feature.customer
 
 import com.example.api.ApiRoutes
 import com.example.api.auth.TokenResponse
+import com.example.api.common.ErrorCode
 import com.example.api.common.ErrorResponse
 import com.example.api.common.FieldLimits
 import com.example.api.common.PageQuery
@@ -19,6 +20,7 @@ import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
@@ -29,9 +31,14 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.time.Instant
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -487,6 +494,138 @@ class CustomerRoutesTest {
         }
 
     @Test
+    fun `a retry with the same idempotency key returns the first customer instead of making another`() =
+        authTestApplication {
+            val client = jsonClient()
+            val token = client.signedIn()
+            val key = UUID.randomUUID().toString()
+            // No email, so the unique index cannot catch the duplicate: only the key can.
+            val request = CustomerRequest(firstName = "Ada", status = CustomerStatus.LEAD)
+
+            val first = client.createCustomer(token, request, key)
+            val retry = client.createCustomer(token, request, key)
+
+            assertEquals(HttpStatusCode.Created, first.status)
+            assertEquals(HttpStatusCode.Created, retry.status)
+            assertEquals(first.body<CustomerResponse>(), retry.body<CustomerResponse>())
+            assertEquals(first.headers[HttpHeaders.Location], retry.headers[HttpHeaders.Location])
+            assertEquals(1, client.listCustomers(token).items.size)
+        }
+
+    @Test
+    fun `a retry that carries an email is replayed rather than refused as a conflict`() =
+        authTestApplication {
+            val client = jsonClient()
+            val token = client.signedIn()
+            val key = UUID.randomUUID().toString()
+            val first = client.createCustomer(token, fullRequest(), key).body<CustomerResponse>()
+
+            val retry = client.createCustomer(token, fullRequest(email = " ADA@example.com"), key)
+
+            assertEquals(HttpStatusCode.Created, retry.status, "a retry differing only in email case or spacing is the same request")
+            assertEquals(first.id, retry.body<CustomerResponse>().id)
+        }
+
+    @Test
+    fun `without an idempotency key a repeated create makes a second customer`() =
+        authTestApplication {
+            val client = jsonClient()
+            val token = client.signedIn()
+            val request = CustomerRequest(firstName = "Ada", status = CustomerStatus.LEAD)
+
+            client.createCustomer(token, request)
+            client.createCustomer(token, request)
+
+            assertEquals(2, client.listCustomers(token).items.size)
+        }
+
+    @Test
+    fun `concurrent creates with one idempotency key make one customer`() =
+        authTestApplication {
+            val client = jsonClient()
+            val token = client.signedIn()
+            val key = UUID.randomUUID().toString()
+
+            val responses =
+                coroutineScope {
+                    List(5) { async { client.createCustomer(token, fullRequest(), key) } }.awaitAll()
+                }
+
+            assertTrue(responses.all { it.status == HttpStatusCode.Created }, "statuses: ${responses.map { it.status }}")
+            assertEquals(1, responses.map { it.body<CustomerResponse>().id }.toSet().size)
+            assertEquals(1, client.listCustomers(token).items.size)
+        }
+
+    @Test
+    fun `refuses an idempotency key sent again with a different body`() =
+        authTestApplication {
+            val client = jsonClient()
+            val token = client.signedIn()
+            val key = UUID.randomUUID().toString()
+            client.createCustomer(token, fullRequest(), key)
+
+            val response = client.createCustomer(token, fullRequest().copy(firstName = "Grace"), key)
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertEquals(ErrorCode.IDEMPOTENCY_KEY_REUSED, response.body<ErrorResponse>().code)
+            assertEquals(1, client.listCustomers(token).items.size)
+        }
+
+    @Test
+    fun `rejects an idempotency key that is not a canonical uuid`() =
+        authTestApplication {
+            val client = jsonClient()
+            val token = client.signedIn()
+
+            assertValidationError(client.createCustomer(token, fullRequest(), "not-a-uuid"))
+            assertValidationError(client.createCustomer(token, fullRequest(), "1-1-1-1-1"))
+            assertTrue(client.listCustomers(token).items.isEmpty())
+        }
+
+    @Test
+    fun `another account's identical idempotency key creates that account's own customer`() =
+        authTestApplication {
+            val client = jsonClient()
+            val key = UUID.randomUUID().toString()
+            val mine = client.createCustomer(client.signedIn(), fullRequest(), key).body<CustomerResponse>()
+
+            val theirs = client.createCustomer(client.signedIn(), fullRequest(), key)
+
+            assertEquals(HttpStatusCode.Created, theirs.status)
+            assertNotEquals(mine.id, theirs.body<CustomerResponse>().id)
+        }
+
+    @Test
+    fun `a create that fails leaves its idempotency key free for the retry`() =
+        authTestApplication {
+            val client = jsonClient()
+            val token = client.signedIn()
+            val key = UUID.randomUUID().toString()
+            val holder = client.createCustomer(token, fullRequest()).body<CustomerResponse>()
+            assertEquals(HttpStatusCode.Conflict, client.createCustomer(token, fullRequest(), key).status)
+            client.delete(ApiRoutes.Customers.byId(holder.id)) { bearerAuth(token) }
+
+            val retry = client.createCustomer(token, fullRequest(), key)
+
+            assertEquals(HttpStatusCode.Created, retry.status)
+        }
+
+    @Test
+    fun `replaying a key whose customer was deleted is a conflict`() =
+        authTestApplication {
+            val client = jsonClient()
+            val token = client.signedIn()
+            val key = UUID.randomUUID().toString()
+            val customer = client.createCustomer(token, fullRequest(), key).body<CustomerResponse>()
+            client.delete(ApiRoutes.Customers.byId(customer.id)) { bearerAuth(token) }
+
+            val retry = client.createCustomer(token, fullRequest(), key)
+
+            assertEquals(HttpStatusCode.Conflict, retry.status)
+            assertTrue(client.listCustomers(token).items.isEmpty(), "a replay must not bring the customer back")
+        }
+
+    @Test
     fun `another account may keep a customer with the same email`() =
         authTestApplication {
             val client = jsonClient()
@@ -564,10 +703,12 @@ private suspend fun HttpClient.signedIn(): String = register(uniqueEmail(), VALI
 private suspend fun HttpClient.createCustomer(
     accessToken: String,
     request: CustomerRequest,
+    idempotencyKey: String? = null,
 ): HttpResponse =
     post(ApiRoutes.Customers.PATH) {
         bearerAuth(accessToken)
         contentType(ContentType.Application.Json)
+        idempotencyKey?.let { header(ApiRoutes.Customers.IDEMPOTENCY_KEY, it) }
         setBody(request)
     }
 

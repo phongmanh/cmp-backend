@@ -15,7 +15,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.compoundAnd
 import org.jetbrains.exposed.sql.compoundOr
-import org.jetbrains.exposed.sql.insertAndGetId
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
@@ -31,23 +31,56 @@ import java.util.UUID
  * customer by id alone, so a caller cannot be handed somebody else's by passing the wrong id.
  */
 class CustomerRepository {
+    /**
+     * With [idempotency], the key is claimed before the customer is written and in the same
+     * transaction, so a racing retry blocks on the key and fails on it, never on the email, and a
+     * create that fails for any other reason leaves the key free to try again.
+     */
     suspend fun create(
         ownerId: UUID,
         details: CustomerDetails,
+        idempotency: IdempotentCreate?,
     ): Customer =
-        translatingDuplicateEmail {
+        translatingUniqueViolations {
             dbQuery {
                 val now = now()
-                val id =
-                    CustomerTable
-                        .insertAndGetId {
-                            it[CustomerTable.ownerId] = ownerId
-                            it.write(details)
-                            it[createdAt] = now
-                            it[updatedAt] = now
-                        }.value
+                val id = UUID.randomUUID()
+                if (idempotency != null) {
+                    CustomerIdempotencyKeyTable.insert {
+                        it[CustomerIdempotencyKeyTable.ownerId] = ownerId
+                        it[idempotencyKey] = idempotency.key
+                        it[requestHash] = idempotency.requestHash
+                        it[customerId] = id
+                        it[createdAt] = now
+                    }
+                }
+                CustomerTable.insert {
+                    it[CustomerTable.id] = id
+                    it[CustomerTable.ownerId] = ownerId
+                    it.write(details)
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
                 Customer(id, ownerId, details, createdAt = now, updatedAt = now)
             }
+        }
+
+    suspend fun findIdempotencyRecord(
+        ownerId: UUID,
+        key: UUID,
+    ): IdempotencyRecord? =
+        dbQuery {
+            CustomerIdempotencyKeyTable
+                .selectAll()
+                .where {
+                    (CustomerIdempotencyKeyTable.ownerId eq ownerId) and (CustomerIdempotencyKeyTable.idempotencyKey eq key)
+                }.singleOrNull()
+                ?.let {
+                    IdempotencyRecord(
+                        customerId = it[CustomerIdempotencyKeyTable.customerId].value,
+                        requestHash = it[CustomerIdempotencyKeyTable.requestHash],
+                    )
+                }
         }
 
     suspend fun findById(
@@ -93,7 +126,7 @@ class CustomerRepository {
         customerId: UUID,
         details: CustomerDetails,
     ): Customer? =
-        translatingDuplicateEmail {
+        translatingUniqueViolations {
             dbQuery {
                 val rowsWritten =
                     CustomerTable.update({ (CustomerTable.id eq customerId) and liveFor(ownerId) }) {
@@ -167,14 +200,14 @@ private fun startsAfter(cursor: CustomerCursor): Op<Boolean> =
         ((CustomerTable.createdAt less cursor.createdAt) or (CustomerTable.id less cursor.id))
 
 /**
- * The unique index is the only thing that can settle two writes racing for one address, so its
- * violation is the signal rather than a lookup beforehand, which would leave a gap between the check
- * and the write for a second request to land in.
+ * A unique index is the only thing that can settle two writes racing for one address or one
+ * idempotency key, so its violation is the signal rather than a lookup beforehand, which would leave
+ * a gap between the check and the write for a second request to land in.
  *
  * Caught outside `dbQuery` on purpose: once a statement fails, Postgres refuses everything else in
  * that transaction, so there is nothing useful left to do inside it.
  */
-private suspend fun <T> translatingDuplicateEmail(block: suspend () -> T): T =
+private suspend fun <T> translatingUniqueViolations(block: suspend () -> T): T =
     try {
         block()
     } catch (cause: ExposedSQLException) {
@@ -184,8 +217,11 @@ private suspend fun <T> translatingDuplicateEmail(block: suspend () -> T): T =
                 .firstOrNull()
                 ?.serverErrorMessage
                 ?.constraint
-        if (violated == CUSTOMER_EMAIL_UNIQUE_INDEX) throw DuplicateCustomerEmailException()
-        throw cause
+        when (violated) {
+            CUSTOMER_EMAIL_UNIQUE_INDEX -> throw DuplicateCustomerEmailException()
+            CUSTOMER_IDEMPOTENCY_KEY_PRIMARY_KEY -> throw DuplicateIdempotencyKeyException()
+            else -> throw cause
+        }
     }
 
 private fun UpdateBuilder<*>.write(details: CustomerDetails) {

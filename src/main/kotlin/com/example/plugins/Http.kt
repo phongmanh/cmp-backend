@@ -1,5 +1,6 @@
 package com.example.plugins
 
+import com.example.api.ApiRoutes
 import com.example.common.AppConfig
 import com.example.feature.auth.AUTH_RATE_LIMIT
 import com.example.feature.user.UPLOAD_RATE_LIMIT
@@ -49,6 +50,7 @@ fun Application.configureHttp() {
         }
         allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
+        allowHeader(ApiRoutes.Customers.IDEMPOTENCY_KEY)
         allowMethod(HttpMethod.Get)
         allowMethod(HttpMethod.Post)
         allowMethod(HttpMethod.Put)

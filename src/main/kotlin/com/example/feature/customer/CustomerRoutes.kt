@@ -19,6 +19,7 @@ import com.example.common.pageLimit
 import com.example.common.payloadTooLarge
 import com.example.common.requireUserId
 import com.example.common.unauthorized
+import com.example.common.unprocessable
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.openapi.jsonSchema
@@ -85,7 +86,7 @@ fun Application.customerRoutes() {
         authenticate("auth-jwt") {
             post(ApiRoutes.Customers.PATH) {
                 val request = call.receive<CustomerRequest>()
-                val customer = customerService.create(call.requireUserId(), request.toDetails())
+                val customer = customerService.create(call.requireUserId(), request.toDetails(), call.idempotencyKey())
                 call.response.headers.append(HttpHeaders.Location, ApiRoutes.Customers.byId(customer.id.toString()))
                 call.respond(HttpStatusCode.Created, customer.toResponse())
             }.describe {
@@ -100,7 +101,21 @@ fun Application.customerRoutes() {
 
                     `email` is trimmed and lowercased before it is stored, and must be unique among your own
                     live customers. Another account holding the same address makes no difference.
+
+                    Send an `Idempotency-Key` to make retries safe. A request that repeats a key you already
+                    used, with the same body, creates nothing and answers `201` with the customer the first
+                    request made, as it stands now. The same key with a different body is refused with `422`.
                     """.trimIndent()
+                parameters {
+                    header(ApiRoutes.Customers.IDEMPOTENCY_KEY) {
+                        description =
+                            """
+                            Optional. A UUID generated once for this customer and sent again, unchanged, on every
+                            retry of the same create. Keys belong to your account, so another account's cannot clash.
+                            """.trimIndent()
+                        schema = jsonSchema<String>()
+                    }
+                }
                 responses {
                     HttpStatusCode.Created {
                         description = "The customer was created."
@@ -113,7 +128,8 @@ fun Application.customerRoutes() {
                     }
                     badRequest()
                     unauthorized()
-                    conflict("You already have a customer with that email address.")
+                    conflict("You already have a customer with that email address, or the customer this key created was deleted.")
+                    unprocessable("The `Idempotency-Key` was already used with a different body.")
                     payloadTooLarge()
                     internalError()
                 }
@@ -269,6 +285,19 @@ private fun ApplicationCall.customerListQuery(): CustomerListQuery {
         status = status,
         search = search,
     )
+}
+
+/**
+ * A UUID in its canonical 36-character form and nothing else. `UUID.fromString` alone would take
+ * `1-1-1-1-1`, which invites a client to count its keys up from one. Absent means the caller did
+ * not ask for retries to be safe.
+ */
+private fun ApplicationCall.idempotencyKey(): UUID? {
+    val raw = request.headers[ApiRoutes.Customers.IDEMPOTENCY_KEY]?.trim() ?: return null
+    return runCatching { UUID.fromString(raw) }
+        .getOrNull()
+        ?.takeIf { it.toString() == raw.lowercase() }
+        ?: throw ValidationException("The Idempotency-Key must be a UUID.")
 }
 
 /**

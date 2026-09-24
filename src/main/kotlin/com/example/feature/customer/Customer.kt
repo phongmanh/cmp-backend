@@ -49,6 +49,24 @@ data class CustomerPage(
 )
 
 /**
+ * What an `Idempotency-Key` stands for: the create it was first sent with, reduced to [requestHash]
+ * so a retry can be told apart from a different request that reused the key.
+ */
+data class IdempotentCreate(
+    val key: UUID,
+    val requestHash: String,
+)
+
+/** The customer an earlier create made under a key, and the hash of the request that made it. */
+data class IdempotencyRecord(
+    val customerId: UUID,
+    val requestHash: String,
+)
+
+/** The repository's way of saying another request already claimed that owner's key. */
+class DuplicateIdempotencyKeyException : RuntimeException("The owner already used that idempotency key.")
+
+/**
  * The repository's way of saying the owner already has a live customer with that email. Kept free
  * of any HTTP meaning: the service decides that it is a conflict and what to tell the caller.
  */

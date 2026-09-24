@@ -81,5 +81,12 @@ object ApiRoutes {
 
         /** Case-insensitive prefix of a first name, last name, company name or email. */
         const val SEARCH = "q"
+
+        /**
+         * Request header on `POST` [PATH]: a UUID the app generates once per customer it means to
+         * create and sends again on every retry of that create, so a retry after a lost response
+         * returns the customer that was made instead of making a second one.
+         */
+        const val IDEMPOTENCY_KEY = "Idempotency-Key"
     }
 }

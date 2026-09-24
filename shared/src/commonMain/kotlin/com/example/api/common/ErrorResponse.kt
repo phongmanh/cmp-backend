@@ -41,4 +41,10 @@ object ErrorCode {
      * thing about all of them — ask for a different file — and the message says which it was.
      */
     const val UNSUPPORTED_IMAGE = "UNSUPPORTED_IMAGE"
+
+    /**
+     * An `Idempotency-Key` came back with a different body from the request it was first sent with.
+     * A client bug rather than a retry: a new customer needs a new key.
+     */
+    const val IDEMPOTENCY_KEY_REUSED = "IDEMPOTENCY_KEY_REUSED"
 }

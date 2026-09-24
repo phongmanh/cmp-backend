@@ -1,8 +1,12 @@
 package com.example.feature.customer
 
+import com.example.api.common.ErrorCode
+import com.example.common.BusinessRuleException
 import com.example.common.ConflictException
 import com.example.common.ResourceNotFoundException
 import org.slf4j.LoggerFactory
+import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.UUID
 
 /**
@@ -14,19 +18,51 @@ class CustomerService(
 ) {
     private val logger = LoggerFactory.getLogger(CustomerService::class.java)
 
+    /**
+     * With an [idempotencyKey], a retry of a create that already happened returns that customer
+     * rather than making another. The lookup first answers the ordinary retry without a write; the
+     * key's primary key settles the one where both attempts arrive together.
+     */
     suspend fun create(
         ownerId: UUID,
         details: CustomerDetails,
+        idempotencyKey: UUID?,
     ): Customer {
+        val normalized = details.normalized()
+        val idempotency = idempotencyKey?.let { IdempotentCreate(it, normalized.requestHash()) }
+
+        if (idempotency != null) {
+            customerRepository.findIdempotencyRecord(ownerId, idempotency.key)?.let { return replay(ownerId, it, idempotency) }
+        }
+
         val customer =
             try {
-                customerRepository.create(ownerId, details.normalized())
+                customerRepository.create(ownerId, normalized, idempotency)
             } catch (_: DuplicateCustomerEmailException) {
                 throw ConflictException(EMAIL_TAKEN)
+            } catch (duplicate: DuplicateIdempotencyKeyException) {
+                // The racing create that claimed the key has committed by now, or this would not have failed.
+                val retry = idempotency ?: throw duplicate
+                val claimed = customerRepository.findIdempotencyRecord(ownerId, retry.key) ?: throw duplicate
+                return replay(ownerId, claimed, retry)
             }
 
         // Identifiers only. A customer's name and contact details are personal data.
         logger.info("Created customer {} for user {}", customer.id, ownerId)
+        return customer
+    }
+
+    /** Answers with the customer as it stands now, which a later replace may have changed. */
+    private suspend fun replay(
+        ownerId: UUID,
+        earlier: IdempotencyRecord,
+        retry: IdempotentCreate,
+    ): Customer {
+        if (earlier.requestHash != retry.requestHash) {
+            throw BusinessRuleException(ErrorCode.IDEMPOTENCY_KEY_REUSED, KEY_REUSED)
+        }
+        val customer = customerRepository.findById(ownerId, earlier.customerId) ?: throw ConflictException(CREATED_THEN_DELETED)
+        logger.info("Replayed create of customer {} for user {}", customer.id, ownerId)
         return customer
     }
 
@@ -78,7 +114,37 @@ class CustomerService(
     private companion object {
         const val NOT_FOUND = "Customer not found."
         const val EMAIL_TAKEN = "You already have a customer with that email address."
+        const val KEY_REUSED = "That Idempotency-Key was already used for a different customer. Send a new key."
+        const val CREATED_THEN_DELETED = "The customer that Idempotency-Key created has since been deleted."
     }
+}
+
+/**
+ * Every field, each written as its length and then its value, so no two different requests can
+ * spell the same string: a null reads as `-`, which no length does, and a value cannot bleed into
+ * the next field. Hashed after [normalized], so a retry that only differs in case or spacing of
+ * the email still matches.
+ */
+private fun CustomerDetails.requestHash(): String {
+    val fields =
+        listOf(
+            firstName,
+            lastName,
+            companyName,
+            email,
+            phone,
+            address?.line1,
+            address?.line2,
+            address?.city,
+            address?.region,
+            address?.postalCode,
+            address?.countryCode,
+            notes,
+            status.key,
+        )
+    val canonical = fields.joinToString("") { field -> field?.let { "${it.length}:$it" } ?: "-" }
+    val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray(Charsets.UTF_8))
+    return HexFormat.of().formatHex(digest)
 }
 
 /**
