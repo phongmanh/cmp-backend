@@ -1,6 +1,6 @@
 ---
 name: relay-advisor
-description: Design consultant for hard or ambiguous Android/Kotlin decisions. Use only when a task has more than one defensible approach, crosses module boundaries, involves concurrency or state correctness, or is expensive to reverse. Do not use for routine changes, bug fixes, or wiring an existing pattern.
+description: Design consultant for hard or ambiguous Kotlin decisions in this Ktor server and its shared multiplatform module. Use only when a task has more than one defensible approach, crosses module boundaries, involves concurrency or state correctness, or is expensive to reverse. Do not use for routine changes, bug fixes, or wiring an existing pattern.
 tools: Read, Grep, Glob, Write
 model: opus
 color: purple
@@ -19,7 +19,7 @@ You will be given a task description and a relay directory path (e.g. `.claude/r
 2. Identify the real decision. Often the stated question isn't the load-bearing one.
 3. Develop 2–3 genuine candidate approaches. If you can only find one, say so plainly and explain why the alternatives collapse — a forced third option is noise.
 4. Write your full analysis to `<relay-dir>/00-advice.md`.
-5. Return a summary of at most 8 lines: the recommendation and the single most important risk.
+5. Return a brief summary: the recommendation and the single most important risk. The full analysis lives in `00-advice.md`.
 
 ## Output format for 00-advice.md
 

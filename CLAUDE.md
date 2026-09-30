@@ -9,7 +9,7 @@ A Ktor (JVM) backend that serves the mobile app. Kotlin only.
 | Piece | Choice |
 |---|---|
 | Framework | Ktor 3.x, Netty engine |
-| Language | Kotlin 2.2, JDK 21 |
+| Language | Kotlin 2.4, JDK 21 |
 | Serialization | kotlinx.serialization |
 | Database | PostgreSQL through Exposed + HikariCP |
 | Migrations | Flyway |
@@ -34,17 +34,24 @@ Always run `./gradlew ktlintFormat && ./gradlew build` before saying a change is
 ## Folder layout
 
 ```
-src/main/kotlin/com/example/
-├── Application.kt          # entry point, wires modules only
-├── plugins/                # configureSerialization, configureSecurity, etc.
-├── feature/
-│   └── user/
-│       ├── UserRoutes.kt       # HTTP layer
-│       ├── UserService.kt      # business rules
-│       ├── UserRepository.kt   # database access
-│       ├── UserTable.kt        # Exposed table
-│       └── UserDto.kt          # request/response models
-└── common/                 # errors, extensions, shared helpers
+src/main/kotlin/
+├── Application.kt              # entry point; modules are wired in application.yaml
+└── com/example/
+    ├── plugins/                # configureSecurity, configureStatusPages, etc.
+    ├── feature/
+    │   └── user/
+    │       ├── UserRoutes.kt       # HTTP layer
+    │       ├── UserService.kt      # business rules
+    │       ├── UserRepository.kt   # database access
+    │       ├── UserTable.kt        # Exposed table
+    │       ├── User.kt             # domain model
+    │       └── UserMapper.kt       # domain -> response DTO
+    └── common/                 # errors, extensions, shared helpers
+
+shared/src/commonMain/kotlin/com/example/api/   # Kotlin Multiplatform module, also used by the mobile app
+├── ApiRoutes.kt                # route paths, including the /api/v1 prefix
+├── common/                     # ErrorResponse, Page, FieldLimits
+└── user/                       # request/response DTOs, one folder per feature
 ```
 
 New code goes inside a feature folder. Do not create a top-level `services/`, `controllers/`, or `models/` folder — this project groups by feature, not by layer.

@@ -1,6 +1,6 @@
 ---
 name: relay-implementer
-description: Executes an approved plan file in the relay, writing real Kotlin/Android code. Use after relay-planner has produced a plan, and again to address relay-reviewer findings. Follows the plan exactly rather than improvising.
+description: Executes an approved plan file in the relay, writing real Kotlin code for this Ktor server and its shared multiplatform module. Use after relay-planner has produced a plan, and again to address relay-reviewer findings. Follows the plan exactly rather than improvising.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
 color: green
@@ -19,14 +19,14 @@ You will be given a relay directory path (e.g. `.claude/relay/<task-slug>/`) and
 1. Read `<relay-dir>/01-plan.md`. This is your specification.
 2. Execute the steps in order. Run each step's **Verify** as you go — not all at the end.
 3. Write `<relay-dir>/02-changes.md`.
-4. Return at most 8 lines: steps completed, build/test status, deviations.
+4. Return a brief summary: steps completed, build/test status, deviations.
 
 ### Fix round (a review file was named)
 
 1. Read `<relay-dir>/03-review-N.md` and `<relay-dir>/01-plan.md`.
 2. Address **every** finding, in order. If you believe a finding is wrong, fix nothing and say why in `02-changes.md` — don't silently skip it.
 3. Append a new round section to `<relay-dir>/02-changes.md` rather than overwriting it. The history matters to the reviewer.
-4. Return at most 8 lines: findings addressed, findings disputed, build/test status.
+4. Return a brief summary: findings addressed, findings disputed, build/test status.
 
 ## When the plan is wrong
 

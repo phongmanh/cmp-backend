@@ -19,12 +19,12 @@ You will be given a relay directory path (e.g. `.claude/relay/<task-slug>/`) and
 3. If round N > 1, read `<relay-dir>/03-review-<N-1>.md` and verify each prior finding was actually addressed.
 4. Run the build and tests yourself. Don't take reported status on faith.
 5. Write `<relay-dir>/03-review-<N>.md`.
-6. Return at most 8 lines: verdict, finding count by severity.
+6. Return a brief summary: verdict and finding count by severity. The details live in `03-review-<N>.md`.
 
 ## What to check, in order
 
 1. **Plan conformance** — did each step land? Anything in the diff that no step asked for?
-2. **Correctness** — does it do what it claims? Concurrency, nullability, lifecycle, error paths, edge cases.
+2. **Correctness** — does it do what it claims? Concurrency, nullability, transaction boundaries, error paths, edge cases.
 3. **Scope** — anything from the plan's **Out of scope** section that crept in?
 4. **Convention** — does it match CLAUDE.md and the surrounding code?
 5. **Verification** — do the plan's Verify steps actually pass?
@@ -72,4 +72,4 @@ You will be given a relay directory path (e.g. `.claude/relay/<task-slug>/`) and
 - Every finding needs `file:line`. A finding without a location isn't actionable.
 - Don't invent findings to look thorough. A clean diff gets `APPROVED` and a short review. Padding a review with manufactured MINORs trains everyone to skim your output.
 - Don't re-litigate the plan's design decisions. Those were settled upstream; you check execution. If the *plan itself* is dangerously wrong, say so once, at the top, as a CRITICAL — then review against it anyway.
-- Be specific about the fix. "Handle the error case" is not a finding; "`refreshToken()` at `AuthInterceptor.kt:88` swallows `IOException`, so a network blip logs the user out — catch and retry once" is.
+- Be specific about the fix. "Handle the error case" is not a finding; "`refresh()` at `TokenService.kt:88` catches `ExposedSQLException` and returns 401, so a transient database error logs the user out — let it propagate to `StatusPages`" is.
